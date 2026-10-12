@@ -193,7 +193,9 @@ const MV = { list: [], pos: 0, images: false, loading: 0, body: null };
 
 function showView(name) {
   for (const view of ['connect', 'main']) $('#view-' + view).hidden = view !== name;
+  $('#intro').hidden = NATIVE || name !== 'connect';
   $('#account').hidden = name !== 'main';
+  document.documentElement.classList.remove('booting');
 }
 
 // ---------- Connect ----------

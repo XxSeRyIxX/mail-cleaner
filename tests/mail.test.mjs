@@ -36,6 +36,16 @@ test('with the relay only the relay may run, never the mail\'s own scripts', () 
   assert.match(page, /<script>alert\(1\)<\/script>/, 'The mail\'s script stays, and no policy allows it.');
 });
 
+test('index.html allows each of its inline scripts by hash', () => {
+  const page = readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  const scripts = [...page.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+  assert.ok(scripts.length, 'index.html should have its desktop marker.');
+  for (const code of scripts) {
+    const hash = `'sha256-${createHash('sha256').update(code, 'utf8').digest('base64')}'`;
+    assert.ok(policyOf(page).includes(hash), `index.html's policy must allow "${code.slice(0, 40)}..." with ${hash}.`);
+  }
+});
+
 test('a mail page drops refresh redirects and escapes plain text', () => {
   const html = mailPage({ content: '<meta content="0;url=https://evil.example/" http-equiv="refresh"><p>Hi</p>', isHtml: true });
   assert.doesNotMatch(html, /refresh/i);

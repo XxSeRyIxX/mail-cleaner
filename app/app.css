@@ -45,6 +45,8 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+/* index.html marks the desktop edition before the first paint; it boots until the app shows a view. */
+.desktop [data-only="web"], .booting #view-connect { display: none !important; }
 .no-sizes .size-only { display: none !important; }
 
 body {
@@ -155,6 +157,7 @@ h3 { font-size: 14px; margin: 0; }
 .credits li + li { margin-top: 4px; }
 .doc { line-height: 1.6; }
 .doc h2 { margin-top: 18px; }
+.doc > h2:first-child { margin-top: 0; }
 .doc ul { padding-left: 20px; }
 a.brand { color: inherit; text-decoration: none; }
 

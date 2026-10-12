@@ -4,14 +4,17 @@
 <head>
   <meta charset="utf-8">
   <!-- GitHub Pages can't send headers, so the page carries its own policy. Mail bodies inherit it in their frame and add a stricter one.
-       The hash is the desktop edition's link relay for mail frames (mail.js). -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client 'sha256-LWPZg8NMc2iP+skodLnE5gZQXyqTY5T8fFsRHmKO1uI='; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; object-src 'none'; base-uri 'none'; form-action 'none'">
+       The hashes are the desktop marker below and the desktop edition's link relay for mail frames (mail.js). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client 'sha256-d5X+g5qHFkPagbpJu0rAwpgB8TPoUNZVFLPJgvJJUYA=' 'sha256-LWPZg8NMc2iP+skodLnE5gZQXyqTY5T8fFsRHmKO1uI='; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Mail Cleaner finds the senders that flood your Outlook or Gmail inbox, then unsubscribes, deletes, archives or blocks them in bulk. It runs in your browser, with no server.">
   <meta name="author" content="XxSeRyIxX">
   <meta name="generator" content="Mail Cleaner d322843150ce2503">
   <title>Mail Cleaner</title>
   <link rel="icon" href="icon.png">
   <link rel="stylesheet" href="app.css">
+  <!-- Marks the desktop edition before the first paint, so parts meant for the website never flash there. -->
+  <script>if (typeof window.external?.receiveMessage === 'function') document.documentElement.classList.add('desktop', 'booting');</script>
   <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -31,7 +34,7 @@
 
   <main>
     <!-- Pick the mail service and sign in -->
-    <section id="view-connect" class="card narrow" hidden>
+    <section id="view-connect" class="card narrow">
       <h1>Clean up your mailbox</h1>
       <p class="muted">Find the senders that flood your inbox, unsubscribe from them and delete everything they sent.
         It all runs <span data-only="web">in this browser tab</span><span data-only="desktop" hidden>on your computer</span>:
@@ -150,6 +153,28 @@
           </div>
         </form>
       </div>
+    </section>
+
+    <!-- What the app does, readable without signing in: Google's review looks for it on the home page. -->
+    <section id="intro" class="card narrow doc" data-only="web">
+      <h2>What Mail Cleaner does</h2>
+      <p>Mail Cleaner is a free, open source app that cleans up Outlook and Gmail mailboxes. It groups your mail by sender, so you
+        see at a glance who fills your inbox and how much space they take, and then lets you:</p>
+      <ul>
+        <li>unsubscribe from senders, using the unsubscribe link they put in their own mails;</li>
+        <li>delete, archive or mark as read everything a sender sent, at any age;</li>
+        <li>block senders, so their next mails go straight to the trash;</li>
+        <li>read single mails, see how much storage your mail uses and empty the trash.</li>
+      </ul>
+      <h2>Why it needs access to your mail</h2>
+      <p>To group your mail it reads the sender, subject, date, size, labels and unsubscribe headers of the mails in the folders you
+        scan, plus the short preview your mail service provides. It opens a mail's full content only when you open that mail. It
+        deletes, moves or marks mail, creates block filters and unsubscribes only after you confirm. With Gmail it also reads your
+        storage quota, through a Google Drive permission that can't see your files.</p>
+      <p>All of this happens in your browser: Mail Cleaner has no server, and your mail is never stored, shared or sold. The
+        <a href="privacy.html">privacy policy</a> has the details.</p>
+      <p>Using Yahoo, iCloud or your own domain? The <a data-link="releases" target="_blank" rel="noopener">desktop edition</a>
+        for Windows, macOS and Linux also works with any IMAP mailbox.</p>
     </section>
 
     <!-- Main -->
@@ -320,7 +345,7 @@
 
   <footer class="footer small muted">
     <button class="link" data-about>About</button> ·
-    <a href="privacy.html">Privacy</a> ·
+    <a href="privacy.html">Privacy policy</a> ·
     <a data-link="repo" target="_blank" rel="noopener">Source code</a>, free under the
     <a data-link="license" target="_blank" rel="noopener">GNU AGPL v3</a>
   </footer>
@@ -346,7 +371,7 @@
       <li><b>Microsoft Graph</b>, the <b>Gmail API</b> and <b>Google Identity Services</b>: the mail services and their sign-in.</li>
     </ul>
     <p class="small"><a data-link="issues" target="_blank" rel="noopener">Report a problem</a> ·
-      <a href="privacy.html" target="_blank">Privacy</a><span id="ab-version" hidden> ·
+      <a href="privacy.html" target="_blank">Privacy policy</a><span id="ab-version" hidden> ·
       <a id="ab-deployed" target="_blank" rel="noopener"></a></span></p>
     <div id="ab-proof" class="box small" hidden>
       <p><b>Original:</b> Mail Cleaner by XxSeRyIxX, <a data-link="repo" target="_blank" rel="noopener">on GitHub</a>.
@@ -360,7 +385,7 @@
 
   <dialog id="privacy" class="wide">
     <div class="row space">
-      <h2>Privacy</h2>
+      <h2>Privacy policy</h2>
       <button class="btn ghost small" data-close>Close</button>
     </div>
     <div id="privacy-body" class="doc"></div>
