@@ -1,0 +1,521 @@
+<!doctype html>
+<!-- Mail Cleaner, Copyright (C) 2026 XxSeRyIxX. SPDX-License-Identifier: AGPL-3.0-or-later. Additional terms: see NOTICE. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- GitHub Pages can't send headers, so the page carries its own policy. Mail bodies inherit it in their frame and add a stricter one.
+       The hash is the desktop edition's link relay for mail frames (mail.js). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client 'sha256-LWPZg8NMc2iP+skodLnE5gZQXyqTY5T8fFsRHmKO1uI='; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="author" content="XxSeRyIxX">
+  <meta name="generator" content="Mail Cleaner d322843150ce2503">
+  <title>Mail Cleaner</title>
+  <link rel="icon" href="icon.png">
+  <link rel="stylesheet" href="app.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" data-only="web">
+      <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="3" fill="currentColor"/><path d="M3.5 7.5 12 13l8.5-5.5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Mail Cleaner
+    </div>
+    <div class="row">
+      <div id="account" class="account" hidden>
+        <span id="account-name"></span>
+        <button id="logout" class="btn ghost small">Sign out</button>
+      </div>
+      <button class="btn ghost small" data-about>About</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Pick the mail service and sign in -->
+    <section id="view-connect" class="card narrow" hidden>
+      <h1>Clean up your mailbox</h1>
+      <p class="muted">Find the senders that flood your inbox, unsubscribe from them and delete everything they sent.
+        It all runs <span data-only="web">in this browser tab</span><span data-only="desktop" hidden>on your computer</span>:
+        your mail goes straight between your mail service and you.</p>
+      <div id="providers" class="seg" role="group" aria-label="Mail service">
+        <button type="button" data-provider="outlook">Outlook, Hotmail, Microsoft 365</button>
+        <button type="button" data-provider="gmail">Gmail</button>
+        <button type="button" data-provider="imap">Other (IMAP)</button>
+      </div>
+
+      <div id="oauth">
+        <button id="login" class="btn primary big">Sign in</button>
+        <p id="login-wait" class="info-box small" hidden>Finish signing in in your browser, then come back here.
+          <button id="login-cancel" type="button" class="link">Cancel</button></p>
+        <p id="login-error" class="error" hidden></p>
+        <p id="login-note" class="muted small">You sign in on <span id="login-company">Microsoft</span>'s own page<span data-only="desktop" hidden>,
+          in your browser</span>: your password never reaches this app.</p>
+        <details id="own-app">
+          <summary id="own-app-title">Use your own app registration instead</summary>
+          <div id="steps-outlook">
+            <p>Microsoft only lets an app read your mail after the app is registered. It's free and takes about two minutes.</p>
+            <ol class="steps">
+              <li>Open <a href="https://entra.microsoft.com" target="_blank" rel="noopener noreferrer">entra.microsoft.com</a>,
+                go to <b>App registrations</b> and click <b>New registration</b>.</li>
+              <li>Name: <code>Mail Cleaner</code>. Supported account types:
+                <b>Any Entra ID tenant + personal Microsoft accounts</b>.</li>
+              <li data-only="web">Redirect URI: pick <b>Single-page application (SPA)</b> and type <code class="redirect-uri"></code>.
+                Click <b>Register</b>.</li>
+              <li data-only="desktop" hidden>Redirect URI: pick <b>Public client/native (mobile &amp; desktop)</b> and type
+                <code class="desktop-redirect"></code>. Click <b>Register</b>.</li>
+              <li>Copy the <b>Application (client) ID</b> from the overview page and paste it here.</li>
+            </ol>
+            <p class="muted small">No Microsoft Entra access with a personal account? Create a free Azure account first;
+              it gives you a "Default Directory" where you can register apps.</p>
+          </div>
+          <div id="steps-gmail" hidden>
+            <p>Google only lets an app read Gmail through a Google Cloud project. Yours is free and takes about ten minutes, once.</p>
+            <ol class="steps">
+              <li>Open <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener noreferrer">console.cloud.google.com</a>
+                and create a project, for example <code>Mail Cleaner</code>.</li>
+              <li>In <b>APIs &amp; Services</b>, <b>Library</b>, find the <b>Gmail API</b> and click <b>Enable</b>.
+                Do the same for the <b>Google Drive API</b>: the app only uses it to show how much storage you use.</li>
+              <li>Open <b>Google Auth Platform</b> and click <b>Get started</b>: any app name, your email, audience <b>External</b>.
+                Then in <b>Audience</b>, under <b>Test users</b>, add your Gmail address.</li>
+              <li data-only="web">In <b>Clients</b>, click <b>Create client</b>, application type <b>Web application</b>. Under
+                <b>Authorized JavaScript origins</b> add <code class="js-origin"></code>. Copy the <b>Client ID</b> and paste it here.
+                There's no secret to copy.</li>
+              <li data-only="desktop" hidden>In <b>Clients</b>, click <b>Create client</b>, application type <b>Desktop app</b>.
+                Copy the <b>Client ID</b> and the <b>Client secret</b> and paste them here. Google doesn't treat a desktop app's
+                secret as a secret: it can't stay hidden in an app people download.</li>
+            </ol>
+            <p class="muted small">At sign-in Google warns that it hasn't verified the app: it's your own, so click <b>Continue</b> and allow
+              what it asks.<span data-only="web"> Google's sign-ins in a browser last an hour; after that the app asks you to click Continue.</span></p>
+          </div>
+          <form id="app-form" class="form">
+            <label>Client ID
+              <input id="client-id" autocomplete="off" spellcheck="false">
+            </label>
+            <label id="f-secret" hidden>Client secret
+              <input id="client-secret" autocomplete="off" spellcheck="false">
+            </label>
+            <label id="f-tenant">Accounts that will sign in
+              <select id="tenant">
+                <option value="common">Any Microsoft account (personal or work/school)</option>
+                <option value="consumers">Personal only (outlook.com, hotmail, live)</option>
+                <option value="organizations">Work or school only</option>
+              </select>
+            </label>
+            <p id="app-error" class="error" hidden></p>
+            <div class="row">
+              <button class="btn">Save</button>
+              <button type="button" id="app-default" class="link" hidden></button>
+            </div>
+          </form>
+        </details>
+      </div>
+
+      <div id="imap" hidden>
+        <div id="imap-desktop-only" class="box">
+          <p>Browsers can't connect to mail servers, so IMAP (Yahoo, iCloud, AOL, GMX, Zoho, your own domain...) only works in the
+            desktop edition of Mail Cleaner, for Windows, macOS and Linux. Download it, run it and pick <b>Other (IMAP)</b> there.</p>
+          <a data-link="releases" target="_blank" rel="noopener">Get the desktop edition</a>
+        </div>
+        <form id="imap-form" class="form">
+          <p>Type your address and the app fills in the server. Many services want an <b>app password</b> rather than your normal
+            password; you create one in your account's security settings.</p>
+          <p class="muted small">Here the app has to keep your password. <span id="imap-keep"></span> and it only goes to your mail
+            server over an encrypted connection. IMAP has no way to block senders, so that option isn't offered.</p>
+          <label>Email address
+            <input id="imap-email" type="email" autocomplete="off" spellcheck="false" placeholder="name@example.com">
+          </label>
+          <p id="imap-tip" class="info-box small" hidden></p>
+          <label>Password or app password
+            <input id="imap-password" type="password" autocomplete="off">
+          </label>
+          <div class="row wrap server">
+            <label class="grow">IMAP server
+              <input id="imap-host" autocomplete="off" spellcheck="false" placeholder="imap.example.com">
+            </label>
+            <label>Port
+              <input id="imap-port" type="number" min="1" max="65535" value="993">
+            </label>
+            <label>Security
+              <select id="imap-security">
+                <option value="ssl">SSL/TLS</option>
+                <option value="starttls">STARTTLS</option>
+              </select>
+            </label>
+          </div>
+          <label>User name <span class="muted">(only if it isn't your email address)</span>
+            <input id="imap-user" autocomplete="off" spellcheck="false">
+          </label>
+          <p id="imap-error" class="error" hidden></p>
+          <div class="row">
+            <button id="imap-save" class="btn primary">Connect</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Main -->
+    <section id="view-main" class="stack" hidden>
+      <div id="storage" class="card storage" hidden>
+        <div class="row space wrap">
+          <h2>Storage</h2>
+          <a id="st-manage" class="small" target="_blank" rel="noopener noreferrer" hidden></a>
+        </div>
+        <div id="st-summary"></div>
+        <div id="st-meter" class="meter" hidden></div>
+        <div id="st-legend" class="legend small"></div>
+        <div id="st-trash-row" class="row wrap">
+          <span id="st-trash" class="small"></span>
+          <button id="st-empty" class="btn small danger" hidden></button>
+        </div>
+        <p id="st-note" class="muted small" hidden></p>
+      </div>
+
+      <div class="card">
+        <div class="row space wrap">
+          <h2>1. Scan</h2>
+          <span id="scan-info" class="muted small"></span>
+        </div>
+        <div id="folders" class="chips"></div>
+        <div class="row wrap">
+          <button id="scan" class="btn primary">Scan</button>
+          <label id="scan-unsub-box" class="row small"><input type="checkbox" id="scan-unsub" checked>
+            Also find unsubscribe links <span class="muted">(runs in the background, you can work meanwhile)</span></label>
+          <button id="more-folders" class="link" hidden></button>
+        </div>
+      </div>
+
+      <div id="job" class="card" hidden>
+        <div class="row space">
+          <b id="job-title"></b>
+          <button id="job-cancel" class="btn ghost small">Stop</button>
+        </div>
+        <div class="bar"><div id="job-bar"></div></div>
+        <div class="row space small">
+          <span id="job-text"></span>
+          <span id="job-note" class="warn-text"></span>
+        </div>
+        <p id="job-help" class="muted small" hidden></p>
+      </div>
+
+      <div id="stats" class="stats" hidden></div>
+
+      <div id="results" class="layout" hidden>
+        <div class="card">
+          <div class="row space wrap">
+            <h2>2. Pick what to clean</h2>
+            <div class="row wrap">
+              <div id="group" class="seg" role="group" aria-label="Group by">
+                <button data-group="sender" class="on">By sender</button>
+                <button data-group="domain">By domain</button>
+              </div>
+              <input id="search" type="search" placeholder="Search sender or subject" autocomplete="off">
+            </div>
+          </div>
+
+          <div class="filters">
+            <div id="chips" class="chips">
+              <button class="chip" data-chip="spam" title="Junk, ignored newsletters and bulk mail">Likely spam</button>
+              <button class="chip" data-chip="unsub" title="Senders with an unsubscribe link">Can unsubscribe</button>
+              <button class="chip" data-chip="unopened" title="Senders whose mail you never opened">Never opened</button>
+              <button class="chip" data-chip="junk" id="chip-junk">In Junk</button>
+              <button class="chip" data-chip="attach">With attachments</button>
+            </div>
+            <div class="row wrap">
+              <label class="filter">Older than
+                <select id="f-age">
+                  <option value="0">any age</option>
+                  <option value="30">1 month</option>
+                  <option value="90">3 months</option>
+                  <option value="180">6 months</option>
+                  <option value="365">1 year</option>
+                  <option value="730">2 years</option>
+                  <option value="1825">5 years</option>
+                </select>
+              </label>
+              <label class="filter">Senders with at least
+                <select id="f-mails">
+                  <option value="1">1 mail</option>
+                  <option value="2">2 mails</option>
+                  <option value="5">5 mails</option>
+                  <option value="10">10 mails</option>
+                  <option value="20">20 mails</option>
+                  <option value="50">50 mails</option>
+                  <option value="100">100 mails</option>
+                </select>
+              </label>
+              <label class="filter size-only">using more than
+                <select id="f-total">
+                  <option value="0">any space</option>
+                  <option value="1">1 MB</option>
+                  <option value="10">10 MB</option>
+                  <option value="50">50 MB</option>
+                  <option value="100">100 MB</option>
+                  <option value="500">500 MB</option>
+                </select>
+              </label>
+              <label class="filter size-only">Mails bigger than
+                <select id="f-mailsize">
+                  <option value="0">any size</option>
+                  <option value="0.1">100 KB</option>
+                  <option value="1">1 MB</option>
+                  <option value="5">5 MB</option>
+                  <option value="10">10 MB</option>
+                </select>
+              </label>
+              <button id="f-reset" class="link" hidden>Reset filters</button>
+            </div>
+          </div>
+
+          <p id="summary" class="summary"></p>
+          <div id="bulk" class="bulk" hidden>
+            <span id="bulk-text"></span>
+            <button id="bulk-remove" class="btn small danger">Remove</button>
+            <button id="bulk-archive" class="btn small">Archive</button>
+            <button id="bulk-read" class="btn small">Mark read</button>
+            <button id="bulk-unsub" class="btn small">Unsubscribe</button>
+            <button id="bulk-add" class="btn small">Add to list</button>
+            <button id="bulk-clear" class="link">Clear</button>
+          </div>
+          <table class="grid">
+            <thead>
+              <tr>
+                <th class="c-sel"><input type="checkbox" id="sel-all" title="Select all"></th>
+                <th class="c-who" data-sort="label">Sender</th>
+                <th class="c-num" data-sort="count">Mails</th>
+                <th class="c-size size-only" data-sort="size">Size</th>
+                <th class="c-num" data-sort="unreadPct">Unread</th>
+                <th class="c-num" data-sort="score" title="How spammy this sender looks (0 to 100). Hover a score to see why.">Spam</th>
+                <th class="c-date" data-sort="latest">Latest</th>
+                <th>Last subject</th>
+                <th class="c-actions"></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <p id="empty" class="empty" hidden></p>
+          <button id="show-more" class="btn ghost wide" hidden></button>
+        </div>
+
+        <aside class="card list-panel">
+          <h2>3. Remove list</h2>
+          <p class="muted small">Everything from these senders or domains gets removed, at any age. The list is saved in this browser, so after your next scan one click cleans them again.</p>
+          <div class="ai-box">
+            <b>Let an AI choose</b>
+            <span class="muted small">Give ChatGPT, Copilot or any AI chat a summary of your senders, then paste its answer back.</span>
+            <div class="row">
+              <button id="ai-export" class="btn small">1. Export for AI</button>
+              <button id="ai-import" class="btn small">2. Paste AI answer</button>
+            </div>
+          </div>
+          <form id="add-form" class="row">
+            <input id="add-input" placeholder="spam@example.com or @example.com" autocomplete="off" spellcheck="false">
+            <button class="btn">Add</button>
+          </form>
+          <ul id="list"></ul>
+          <p id="list-total" class="muted small"></p>
+          <button id="list-clean" class="btn danger big wide" disabled>Remove</button>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer small muted">
+    <button class="link" data-about>About</button> ·
+    <a href="privacy.html">Privacy</a> ·
+    <a data-link="repo" target="_blank" rel="noopener">Source code</a>, free under the
+    <a data-link="license" target="_blank" rel="noopener">GNU AGPL v3</a>
+  </footer>
+
+  <dialog id="about">
+    <div class="row space">
+      <h2>Mail Cleaner</h2>
+      <button class="btn ghost small" data-close>Close</button>
+    </div>
+    <p>Find the senders that flood your mailbox, unsubscribe from them and delete everything they sent, for Outlook,
+      Gmail and IMAP mailboxes. Your mail goes straight between your mail service and you.</p>
+    <p id="ab-copy" class="warn-box" hidden></p>
+    <p id="ab-made">Made by <a data-link="profile" target="_blank" rel="noopener">XxSeRyIxX</a>.
+      Copyright (C) 2026 XxSeRyIxX.</p>
+    <p class="small">Free and open source: you may use, study, share and change it under the
+      <a data-link="license" target="_blank" rel="noopener">GNU Affero General Public License v3</a> or later.
+      It comes with absolutely no warranty. The <a data-link="repo" target="_blank" rel="noopener">source code is on GitHub</a>.</p>
+    <h3>Credits</h3>
+    <ul class="credits small">
+      <li><b>MailKit and MimeKit</b> by Jeffrey Stedfast (MIT): IMAP in the desktop edition.</li>
+      <li><b>Photino.NET</b> by TryPhotino (Apache 2.0): the desktop edition's window.</li>
+      <li><b>Thunderbird's ISP database</b> by Mozilla: finding the IMAP server for an address.</li>
+      <li><b>Microsoft Graph</b>, the <b>Gmail API</b> and <b>Google Identity Services</b>: the mail services and their sign-in.</li>
+    </ul>
+    <p class="small"><a data-link="issues" target="_blank" rel="noopener">Report a problem</a> ·
+      <a href="privacy.html" target="_blank">Privacy</a><span id="ab-version" hidden> ·
+      <a id="ab-deployed" target="_blank" rel="noopener"></a></span></p>
+    <div id="ab-proof" class="box small" hidden>
+      <p><b>Original:</b> Mail Cleaner by XxSeRyIxX, <a data-link="repo" target="_blank" rel="noopener">on GitHub</a>.
+        <b>Build id:</b> <code id="ab-id"></code>. <b>Running at:</b> <span id="ab-where"></span>.</p>
+      <label class="field">Look for the build id in text copied from another app
+        <textarea id="ab-check" rows="2"></textarea>
+      </label>
+      <p id="ab-found"></p>
+    </div>
+  </dialog>
+
+  <dialog id="privacy" class="wide">
+    <div class="row space">
+      <h2>Privacy</h2>
+      <button class="btn ghost small" data-close>Close</button>
+    </div>
+    <div id="privacy-body" class="doc"></div>
+  </dialog>
+
+  <dialog id="clean">
+    <h2 id="cl-title"></h2>
+    <p id="cl-who" class="muted"></p>
+    <p id="cl-scope" class="muted small" hidden></p>
+    <p id="cl-warn" class="warn-box" hidden></p>
+    <div id="cl-remove-box">
+      <label class="option"><input type="checkbox" id="cl-remove"><span id="cl-remove-text"></span></label>
+      <div id="cl-mode" class="indent">
+        <label class="option"><input type="radio" name="cl-mode" value="trash" checked><span id="cl-trash-text"></span></label>
+        <label id="cl-archive-box" class="option"><input type="radio" name="cl-mode" value="archive">
+          <span>move them to <b>Archive</b> <span class="muted">(keeps them, out of the Inbox)</span></span></label>
+        <label id="cl-delete-box" class="option"><input type="radio" name="cl-mode" value="delete">
+          <span>delete right away, skipping <span class="trash-name">Deleted Items</span> <span id="cl-delete-note" class="muted">(faster)</span></span></label>
+      </div>
+    </div>
+    <label id="cl-unsub-box" class="option"><input type="checkbox" id="cl-unsub"><span id="cl-unsub-text"></span></label>
+    <label id="cl-block-box" class="option"><input type="checkbox" id="cl-block"><span id="cl-block-text"></span></label>
+    <div class="row end">
+      <button id="cl-cancel" class="btn ghost">Cancel</button>
+      <button id="cl-ok" class="btn danger">Clean up</button>
+    </div>
+  </dialog>
+
+  <dialog id="confirm">
+    <h2 id="cf-title"></h2>
+    <p id="cf-text"></p>
+    <div class="row end">
+      <button id="cf-cancel" class="btn ghost">Cancel</button>
+      <button id="cf-ok" class="btn danger"></button>
+    </div>
+  </dialog>
+
+  <dialog id="renew">
+    <h2>Continue with Google</h2>
+    <p>Google keeps a sign-in in the browser for one hour. Click <b>Continue</b> to carry on where you left off;
+      Google's window usually opens and closes by itself.</p>
+    <p id="rn-error" class="error" hidden></p>
+    <div class="row end">
+      <button id="rn-stop" class="btn ghost">Stop</button>
+      <button id="rn-ok" class="btn primary">Continue</button>
+    </div>
+  </dialog>
+
+  <dialog id="preview" class="wide">
+    <div class="row space">
+      <h2 id="pv-title"></h2>
+      <button class="btn ghost small" data-close>Close</button>
+    </div>
+    <div id="pv-unsub-info" class="unsub-box" hidden></div>
+    <p id="pv-latest" class="info-box" hidden></p>
+    <div class="scroll">
+      <table class="grid compact clickable">
+        <thead><tr><th class="c-date">Received</th><th class="c-from">From</th><th>Subject</th><th class="c-size size-only">Size</th><th class="c-folder">Folder</th></tr></thead>
+        <tbody id="pv-rows"></tbody>
+      </table>
+      <button id="pv-more" class="btn ghost wide" hidden></button>
+    </div>
+    <p id="pv-note" class="muted small"></p>
+    <div class="row end wrap">
+      <button id="pv-add" class="btn">Add to remove list</button>
+      <button id="pv-read" class="btn">Mark all read</button>
+      <button id="pv-unsub" class="btn">Unsubscribe</button>
+      <button id="pv-remove" class="btn danger">Remove these</button>
+    </div>
+  </dialog>
+
+  <dialog id="mail" class="viewer">
+    <div class="row space">
+      <div class="row">
+        <button id="mv-newer" class="btn ghost small" title="Newer mail">&larr; Newer</button>
+        <button id="mv-older" class="btn ghost small" title="Older mail">Older &rarr;</button>
+        <span id="mv-pos" class="muted small"></span>
+      </div>
+      <button class="btn ghost small" data-close>Close</button>
+    </div>
+    <div class="mail-head">
+      <h2 id="mv-subject"></h2>
+      <div class="muted small"><b id="mv-from"></b> <span id="mv-to"></span></div>
+      <div class="muted small" id="mv-meta"></div>
+    </div>
+    <div class="row wrap">
+      <button id="mv-read" class="btn small"></button>
+      <button id="mv-archive" class="btn small">Archive</button>
+      <button id="mv-delete" class="btn small danger-ghost">Delete</button>
+      <button id="mv-images" class="btn small ghost" title="Remote images let the sender know you opened the mail">Show images</button>
+      <a id="mv-web" class="btn small ghost" target="_blank" rel="noopener noreferrer" hidden>Open in Outlook</a>
+      <span id="mv-status" class="muted small"></span>
+    </div>
+    <!-- No allow-scripts, allow-forms or allow-same-origin: the mail can't run code, submit forms or reach this page. -->
+    <iframe id="mv-body" title="Mail" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe>
+  </dialog>
+
+  <dialog id="links">
+    <div class="row space">
+      <h2>Finish unsubscribing</h2>
+      <button class="btn ghost small" data-close>Close</button>
+    </div>
+    <p class="muted">These senders don't offer one-click unsubscribe. Open each link and confirm on their page.
+      Mail links open your mail app with the message ready to send.</p>
+    <ul id="links-list" class="link-list"></ul>
+  </dialog>
+
+  <dialog id="export" class="wide">
+    <div class="row space">
+      <h2>Export for an AI</h2>
+      <button class="btn ghost small" data-close>Close</button>
+    </div>
+    <p class="muted">Copy this text into ChatGPT, Copilot, Gemini or any AI chat. If it's too long to paste, download it as a file and
+      attach that to the chat instead. It asks the AI which senders to remove, and to answer with a list you bring back here with
+      <b>Paste AI answer</b>. The AI doesn't need the full mails: this summary is enough, and much smaller.</p>
+    <div class="row wrap">
+      <label class="row">Senders
+        <select id="ex-scope">
+          <option value="count">Top 250 by number of mails</option>
+          <option value="size" class="size-only">Top 250 by space used</option>
+          <option value="all">All senders</option>
+          <option value="view">Only what the table shows now</option>
+        </select>
+      </label>
+      <label class="row"><input type="checkbox" id="ex-subjects" checked> Recent subjects</label>
+      <label class="row"><input type="checkbox" id="ex-preview"> Start of their latest mail</label>
+    </div>
+    <label class="field"><span>Your own rules for the AI <span class="muted">(optional)</span></span>
+      <textarea id="ex-notes" rows="2" placeholder="e.g. keep everything from my bank and from school; I never read shopping newsletters"></textarea>
+    </label>
+    <textarea id="ex-text" class="mono" rows="12" readonly aria-label="Text for the AI"></textarea>
+    <div class="row space wrap">
+      <span id="ex-size" class="muted small"></span>
+      <div class="row wrap">
+        <button id="ex-csv-senders" class="btn ghost small">Download senders (CSV)</button>
+        <button id="ex-csv-mails" class="btn ghost small">Download every mail (CSV)</button>
+        <button id="ex-download" class="btn">Download text (.md)</button>
+        <button id="ex-copy" class="btn primary">Copy text</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="import" class="wide">
+    <div class="row space">
+      <h2>Paste the AI's answer</h2>
+      <button class="btn ghost small" data-close>Close</button>
+    </div>
+    <textarea id="im-text" rows="7" placeholder="Paste the whole answer here. The addresses in its code block are picked up."></textarea>
+    <p id="im-note" class="muted small"></p>
+    <div id="im-list" class="pick-list"></div>
+    <div class="row end">
+      <button id="im-add" class="btn primary" disabled>Add to the remove list</button>
+    </div>
+  </dialog>
+
+  <div id="toasts" aria-live="polite"></div>
+</body>
+</html>

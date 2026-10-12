@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/shell/">
+    <Project Path="shell/MailCleaner.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/shell/ShellChecks.csproj" />
+  </Folder>
+</Solution>

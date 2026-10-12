@@ -1,0 +1,190 @@
+# Builds the desktop edition for Windows, macOS and Linux on every push to main, and publishes a release for tags
+# like v1.2.3. Optional default sign-in apps for the downloads: the Variables MICROSOFT_CLIENT_ID and MICROSOFT_TENANT
+# (the website's registration, with the desktop redirect added), GOOGLE_DESKTOP_CLIENT_ID, and the secret
+# GOOGLE_DESKTOP_CLIENT_SECRET. Google doesn't treat a desktop client's secret as a secret, since it can't stay
+# hidden in a download, but keeping it in Secrets keeps it out of the logs.
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths-ignore:
+      - 'README.md'
+      - 'NOTICE'
+      - 'LICENSE'
+      # The icon generator only matters through what it writes into app/ and shell/.
+      - 'tools/**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT: shell/MailCleaner.csproj
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+
+  build:
+    needs: checks
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows-x64
+            rid: win-x64
+          - os: macos-latest
+            label: macos-arm64
+            rid: osx-arm64
+          - os: macos-15-intel
+            label: macos-x64
+            rid: osx-x64
+          - os: ubuntu-latest
+            label: linux-x64
+            rid: linux-x64
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: shell/MailCleaner.csproj
+
+      # Photino renders through the system webview, which on Linux is WebKitGTK.
+      - name: Install WebKitGTK
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-0
+
+      # Tag v1.2.3 -> assembly version 1.2.3; untagged builds stay at 0.0.0.
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          ref='${{ github.ref }}'
+          if [[ "$ref" == refs/tags/v* ]]; then
+            echo "value=${ref#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=0.0.0" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Pull requests build with the empty config.json of the repository.
+      - name: Write config.json (default sign-in apps, the commit and the version)
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && steps.version.outputs.value || '' }}
+          MICROSOFT_CLIENT_ID: ${{ vars.MICROSOFT_CLIENT_ID }}
+          MICROSOFT_TENANT: ${{ vars.MICROSOFT_TENANT }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_DESKTOP_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+        run: ./.github/write-config.ps1
+
+      - name: Publish
+        run: >
+          dotnet publish ${{ env.PROJECT }}
+          -c Release
+          -r ${{ matrix.rid }}
+          -p:Version=${{ steps.version.outputs.value }}
+          -o publish
+
+      - name: Stage (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory out | Out-Null
+          Move-Item publish/MailCleaner.exe out/MailCleaner-${{ matrix.label }}.exe
+
+      - name: Stage (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir out
+          mv publish/MailCleaner out/MailCleaner-${{ matrix.label }}
+          chmod +x out/MailCleaner-${{ matrix.label }}
+
+      # macOS only treats it as a GUI program inside a real .app bundle, and a
+      # bundle is a folder, so it has to be delivered inside a disk image.
+      - name: Stage (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir out stage
+          APP="stage/Mail Cleaner.app"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          mv publish/MailCleaner "$APP/Contents/MacOS/"
+          chmod +x "$APP/Contents/MacOS/MailCleaner"
+          cat > "$APP/Contents/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key><string>Mail Cleaner</string>
+            <key>CFBundleDisplayName</key><string>Mail Cleaner</string>
+            <key>CFBundleIdentifier</key><string>io.github.xxseryixx.mailcleaner</string>
+            <key>CFBundleVersion</key><string>${{ steps.version.outputs.value }}</string>
+            <key>CFBundleShortVersionString</key><string>${{ steps.version.outputs.value }}</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleExecutable</key><string>MailCleaner</string>
+            <key>LSMinimumSystemVersion</key><string>12.0</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          ln -s /Applications stage/Applications
+          hdiutil create \
+            -volname "Mail Cleaner" \
+            -srcfolder stage \
+            -ov -format UDZO \
+            "out/MailCleaner-${{ matrix.label }}.dmg"
+
+      # archive: false uploads the binary as-is instead of wrapping it in a zip.
+      # It only accepts a single file, and names the artifact after it.
+      - uses: actions/upload-artifact@v7
+        with:
+          path: out/*
+          archive: false
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          body: |
+            Download the build for your platform below. Each one is a single
+            self-contained file, with no runtime and no installer.
+
+            - **Windows**: `MailCleaner-windows-x64.exe`
+            - **macOS**: `MailCleaner-macos-arm64.dmg` (Apple Silicon)
+              or `-macos-x64.dmg` (Intel); open it and drag the app to Applications
+            - **Linux**: `MailCleaner-linux-x64`, then `chmod +x`. It needs
+              WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), which most desktops already have.
+
+            > Desktop builds are unsigned. Only override a publisher warning for
+            > a download you trust. On macOS, after trying to open the app, use
+            > System Settings > Privacy & Security > Open Anyway.

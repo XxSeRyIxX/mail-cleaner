@@ -1,0 +1,21 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+publish/
+out/
+artifacts/
+
+# Notes that stay on this computer
+private/
+
+# IDE / tooling
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.DotSettings.user
+
+# OS noise
+.DS_Store
+Thumbs.db

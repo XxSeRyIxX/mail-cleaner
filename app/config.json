@@ -1,0 +1,4 @@
+{
+  "microsoft": { "clientId": "", "tenant": "common" },
+  "google": { "clientId": "" }
+}

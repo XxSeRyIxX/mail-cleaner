@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>MailCleaner</AssemblyName>
+    <RootNamespace>MailCleaner</RootNamespace>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>Mail Cleaner</Product>
+    <Authors>XxSeRyIxX</Authors>
+    <!-- The build id also goes in the Windows version info, which stays readable in the compressed single file. -->
+    <Description>Mail Cleaner by XxSeRyIxX: https://github.com/XxSeRyIxX/mail-cleaner (build d322843150ce2503)</Description>
+    <Version>0.0.0</Version>
+    <Copyright>Copyright (C) 2026 XxSeRyIxX. GNU AGPL v3 or later.</Copyright>
+    <RepositoryUrl>https://github.com/XxSeRyIxX/mail-cleaner</RepositoryUrl>
+  </PropertyGroup>
+
+  <!-- Any RID-targeted publish becomes one self-contained file. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>full</TrimMode>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="BuildId" Value="d322843150ce2503" />
+  </ItemGroup>
+
+  <!-- The web app is the product; it travels inside the executable. RecursiveDir
+       keeps subfolders from collapsing onto the files beside them. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\app\**\*"
+                      LogicalName="site.%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Photino.NET" Version="4.0.16" />
+    <PackageReference Include="MailKitLite" Version="4.18.1" />
+    <!-- DPAPI keeps the IMAP password on Windows; the code never calls it elsewhere. -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
+  </ItemGroup>
+
+</Project>

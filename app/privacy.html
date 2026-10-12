@@ -1,0 +1,70 @@
+<!doctype html>
+<!-- Mail Cleaner, Copyright (C) 2026 XxSeRyIxX. SPDX-License-Identifier: AGPL-3.0-or-later. Additional terms: see NOTICE. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy: Mail Cleaner</title>
+  <link rel="icon" href="icon.png">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./">Mail Cleaner</a>
+  </header>
+  <main>
+    <article class="card narrow doc">
+      <h1>Privacy</h1>
+      <p class="muted">Last updated October 12, 2026.</p>
+
+      <h2>In short</h2>
+      <p>Mail Cleaner runs in your browser, or with the desktop edition on your own computer. It has no server of its own, no
+        accounts, no analytics and no ads. Your mail goes straight between your browser and Microsoft, Google or your mail
+        server. Nobody else receives it, including the author.</p>
+
+      <h2>What it reads and changes</h2>
+      <ul>
+        <li>After you sign in, it lists your folders and reads, for each mail in the folders you scan, the sender, subject, date,
+          size, read state, whether it has attachments and its unsubscribe headers, to show you who sends you what.</li>
+        <li>It reads a mail's content only when you open that mail in the app.</li>
+        <li>It moves, archives, marks or deletes mail, creates block rules or filters and sends unsubscribe requests only after
+          you confirm it in the app.</li>
+        <li>With Gmail it reads your Google storage quota through the Google Drive API, with a permission that can't see your files.</li>
+      </ul>
+
+      <h2>Where it keeps things</h2>
+      <ul>
+        <li>What it reads from your mailbox stays in the page's memory and is gone when you close or reload the tab.</li>
+        <li>Sign-in tokens stay in the tab's session storage and are gone when you close it. Signing out removes them, and for
+          Google also withdraws the app's access. In the desktop edition you sign in in your own browser, and the app keeps the
+          sign-in in memory until you close it.</li>
+        <li>Your settings and your remove list are kept in your browser's local storage, on your device.</li>
+        <li>Desktop edition with IMAP: your mail password is only sent to your mail server, over an encrypted connection. On Windows
+          it's stored on your computer, encrypted with your Windows account; on macOS and Linux the app keeps it only until you
+          close it.</li>
+        <li>Files you export from the desktop edition go to your Downloads folder.</li>
+      </ul>
+
+      <h2>Who it talks to</h2>
+      <p>Only Microsoft (sign-in and Microsoft Graph) or Google (sign-in, the Gmail API and the Google Drive API); the unsubscribe
+        addresses senders put in their mails, when you choose to unsubscribe; and in the desktop edition your IMAP server, plus
+        autoconfig.thunderbird.net, which receives only the domain of your address when the app looks up your server. The text for
+        an AI is something you copy or download yourself: the app never sends it anywhere.</p>
+
+      <h2>Google user data</h2>
+      <p>Mail Cleaner's use and transfer of information received from Google APIs adheres to the
+        <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the
+        Limited Use requirements. Google user data is used only for the features you see in the app. It is not stored on any
+        server, not transferred to anyone, not used for advertising and not read by people.</p>
+
+      <h2>Your control</h2>
+      <p>Sign out at any time. You can also remove the app's access in your Microsoft account (Privacy, Apps and services) or at
+        <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</p>
+
+      <h2>Contact</h2>
+      <p>Open an issue at <a href="https://github.com/XxSeRyIxX/mail-cleaner/issues">github.com/XxSeRyIxX/mail-cleaner</a>.</p>
+    </article>
+  </main>
+</body>
+</html>

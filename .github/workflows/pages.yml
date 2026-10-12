@@ -1,0 +1,70 @@
+# Publishes the web app (the app folder) to GitHub Pages when a push to main changes it.
+# One-time: Settings > Pages > Source: GitHub Actions.
+# Optional default sign-in apps, so visitors don't have to register their own: Settings > Secrets and variables >
+# Actions > Variables: MICROSOFT_CLIENT_ID, MICROSOFT_TENANT (common, consumers or organizations) and GOOGLE_CLIENT_ID.
+# These are public identifiers, not secrets: they end up in config.json for anyone to read. Never put a client secret here.
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/write-config.ps1'
+      - '.github/workflows/checks.yml'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+
+  deploy:
+    needs: checks
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Write config.json (default sign-in apps and the commit being deployed)
+        shell: pwsh
+        env:
+          MICROSOFT_CLIENT_ID: ${{ vars.MICROSOFT_CLIENT_ID }}
+          MICROSOFT_TENANT: ${{ vars.MICROSOFT_TENANT }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+        run: |
+          ./.github/write-config.ps1
+          Get-Content app/config.json
+
+      # GitHub Pages lets browsers cache files for 10 minutes: commit-stamped URLs keep a new page from running old scripts.
+      # Every import must carry the same stamp, or a module would load twice.
+      - name: Stamp the script and style URLs with the commit
+        run: |
+          v="${GITHUB_SHA::7}"
+          sed -i -E "s#(src|href)=\"(app\.(js|css))\"#\1=\"\2?v=$v\"#" app/*.html
+          sed -i -E "s#from '\./([a-z]+\.js)'#from './\1?v=$v'#" app/*.js
+          if grep -nE "from ['\"][^'\"]+\.js['\"]|(src|href)=\"app\.(js|css)\"" app/*.js app/*.html; then
+            echo "::error::Unstamped URLs left (above)"; exit 1
+          fi
+          grep -c "?v=$v" app/*.html app/*.js
+
+      # app/ is the site: no build step beyond the two above.
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: app
+
+      - id: deployment
+        uses: actions/deploy-pages@v5
