@@ -93,7 +93,7 @@ function explain(error, description) {
     ? `Mobile and desktop applications with the redirect URI ${DESKTOP_REDIRECT}.`
     : `Single-page application with the redirect URI ${appUrl()} and remove that address from Web or Mobile and desktop, if it's there.`);
   const us = NATIVE ? 'Mail Cleaner' : 'this page';
-  if (/AADSTS9002326|AADSTS9002327|AADSTS7000218|AADSTS70002\b/.test(text)) {
+  if (/AADSTS9002326|AADSTS9002327|AADSTS90023\b|AADSTS7000218|AADSTS70002\b/.test(text)) {
     return `Your app registration doesn't treat ${NATIVE ? 'Mail Cleaner as a desktop app' : 'this page as a single-page app'}. ${fix}`;
   }
   if (/AADSTS50011/.test(text)) return `The address of ${us} isn't a redirect URI of your app registration. ${fix}`;
