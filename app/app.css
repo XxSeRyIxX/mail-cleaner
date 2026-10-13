@@ -78,7 +78,6 @@ code { background: var(--hover); border: 1px solid var(--line); border-radius: 6
 /* Stays on the right in the desktop edition, which hides the brand. */
 .topbar > .row { margin-left: auto; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 16px; }
-.brand svg { color: var(--brand); }
 .account { display: flex; align-items: center; gap: 12px; color: var(--muted); }
 
 main { max-width: 1680px; margin: 0 auto; padding: 20px 24px 60px; }

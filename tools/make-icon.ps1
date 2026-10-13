@@ -1,39 +1,62 @@
 Add-Type -AssemblyName System.Drawing
 
-# Draws the envelope from the page header. The PNG is the web icon, the ICO is for the Windows executable.
+# Draws the logo, an envelope and a broom on a teal tile, on a 256-unit grid. The PNG is the site's icon and logo (also
+# the one for Google's consent screen), the ICO is for the Windows executable.
 $web = Join-Path $PSScriptRoot '..\app'
 $out = Join-Path $PSScriptRoot '..\shell'
-$brand = [Drawing.Color]::FromArgb(15, 108, 189)
 
-function New-Envelope([int]$size) {
-    $bmp = New-Object Drawing.Bitmap $size, $size
-    $g = [Drawing.Graphics]::FromImage($bmp)
-    $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $g.Clear([Drawing.Color]::Transparent)
+function P([float]$x, [float]$y) { New-Object Drawing.PointF $x, $y }
+function Rgb([string]$hex) { [Drawing.ColorTranslator]::FromHtml($hex) }
 
-    # The header's envelope, enlarged to fill the square: a rounded rectangle, then the flap as a white V.
-    $k = $size / 24.0
-    $x = 1.0 * $k; $y = 4.0 * $k; $w = 22.0 * $k; $h = 16.0 * $k; $r = 3.0 * $k
+function New-RoundedRect([float]$x, [float]$y, [float]$w, [float]$h, [float]$r) {
     $path = New-Object Drawing.Drawing2D.GraphicsPath
     $path.AddArc($x, $y, 2 * $r, 2 * $r, 180, 90)
     $path.AddArc($x + $w - 2 * $r, $y, 2 * $r, 2 * $r, 270, 90)
     $path.AddArc($x + $w - 2 * $r, $y + $h - 2 * $r, 2 * $r, 2 * $r, 0, 90)
     $path.AddArc($x, $y + $h - 2 * $r, 2 * $r, 2 * $r, 90, 90)
     $path.CloseFigure()
-    $brush = New-Object Drawing.SolidBrush $brand
-    $g.FillPath($brush, $path)
+    return $path
+}
 
-    $pen = New-Object Drawing.Pen ([Drawing.Color]::White), ([Math]::Max(1.0, 2.0 * $k))
+function New-RoundPen([string]$hex, [float]$width) {
+    $pen = New-Object Drawing.Pen (Rgb $hex), $width
     $pen.StartCap = [Drawing.Drawing2D.LineCap]::Round
     $pen.EndCap = [Drawing.Drawing2D.LineCap]::Round
     $pen.LineJoin = [Drawing.Drawing2D.LineJoin]::Round
-    $flap = [Drawing.PointF[]]@(
-        (New-Object Drawing.PointF (3.5 * $k), (7.0 * $k)),
-        (New-Object Drawing.PointF (12.0 * $k), (13.0 * $k)),
-        (New-Object Drawing.PointF (20.5 * $k), (7.0 * $k)))
-    $g.DrawLines($pen, $flap)
+    return $pen
+}
 
-    $pen.Dispose(); $brush.Dispose(); $path.Dispose(); $g.Dispose()
+function New-Logo([int]$size) {
+    $bmp = New-Object Drawing.Bitmap $size, $size
+    $g = [Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.PixelOffsetMode = [Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+    $g.Clear([Drawing.Color]::Transparent)
+    $g.ScaleTransform($size / 256, $size / 256)
+
+    $teal = New-Object Drawing.Drawing2D.LinearGradientBrush (P 0 0), (P 256 256), (Rgb '#0F766E'), (Rgb '#14B8A6')
+    $g.FillPath($teal, (New-RoundedRect 0 0 256 256 58))
+
+    $g.FillPath([Drawing.Brushes]::White, (New-RoundedRect 36 70 140 98 14.7))
+    $g.DrawLines((New-RoundPen '#0F766E' 12.25), [Drawing.PointF[]]@((P 48 84), (P 106 121), (P 164 84)))
+
+    # The broom leans over the envelope's corner, sweeping it.
+    $g.TranslateTransform(186, 152)
+    $g.RotateTransform(35)
+    $wood = New-Object Drawing.SolidBrush (Rgb '#92400E')
+    $g.FillPath($wood, (New-RoundedRect -7 -104 14 100 7))
+    $g.FillPath($wood, (New-RoundedRect -18 -12 36 16 5))
+    $bristles = New-Object Drawing.Drawing2D.GraphicsPath
+    $bristles.AddLines([Drawing.PointF[]]@((P -18 4), (P 18 4), (P 36 64)))
+    $bristles.AddBezier((P 36 64), (P 12 72), (P -12 72), (P -36 64))
+    $bristles.CloseFigure()
+    $g.FillPath((New-Object Drawing.SolidBrush (Rgb '#FBBF24')), $bristles)
+    $slit = New-RoundPen '#D97706' 5
+    $g.DrawLine($slit, (P -8 14), (P -17 60))
+    $g.DrawLine($slit, (P 0 14), (P 0 66))
+    $g.DrawLine($slit, (P 8 14), (P 17 60))
+
+    $g.Dispose()
     return $bmp
 }
 
@@ -67,13 +90,13 @@ function ConvertTo-Png($bmp) {
     return $ms.ToArray()
 }
 
-$png = New-Envelope 256
+$png = New-Logo 256
 $png.Save((Join-Path $web 'icon.png'), [Drawing.Imaging.ImageFormat]::Png)
 $png.Dispose()
 
 $sizes = 16, 20, 24, 32, 40, 48, 64, 128, 256
 $frames = foreach ($s in $sizes) {
-    $bmp = New-Envelope $s
+    $bmp = New-Logo $s
     $data = if ($s -ge 128) { ConvertTo-Png $bmp } else { ConvertTo-Dib $bmp }
     $bmp.Dispose()
     , $data
