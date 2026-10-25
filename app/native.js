@@ -5,6 +5,8 @@
 // window.external.sendMessage and receiveMessage. Each request carries an id, so a scan, a mail and a token can be on
 // their way at once, and a signal can stop one. On the website there is no shell.
 
+import { t } from './i18n.js';
+
 /** Sends requests over a transport ({ sendMessage, receiveMessage }) and settles each with the reply for its id. */
 export function createBridge(transport) {
   const pending = new Map();
@@ -43,7 +45,7 @@ export function createBridge(transport) {
       settle(reply) {
         signal?.removeEventListener('abort', stop);
         if (reply.ok) resolve(reply.data ?? null);
-        else reject(Object.assign(new Error(reply.error || 'The desktop app couldn\'t do that.'), { status: reply.status || 500 }));
+        else reject(Object.assign(new Error(reply.error || t('native.failed')), { status: reply.status || 500 }));
       },
     });
     signal?.addEventListener('abort', stop, { once: true });

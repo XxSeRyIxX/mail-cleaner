@@ -4,8 +4,11 @@
 // What every mail service shares: jobs, pacing and retries, mail header parsing, the scanned mailbox and the
 // cleanup steps. No DOM here; the services live in outlook.js, gmail.js and imap.js.
 
-export const fmt = n => Number(n || 0).toLocaleString();
-export const plural = (n, word, many = word + 's') => `${fmt(n)} ${n === 1 ? word : many}`;
+import { fmt, t, tn, noun } from './i18n.js';
+
+export { fmt };
+/** "3 mails", in the interface language: `key` names the word in i18n.js. */
+export const plural = (n, key) => `${fmt(n)} ${noun(key, n)}`;
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 
 /** Consecutive slices of at most `size` items. */
@@ -44,7 +47,7 @@ export class ServiceError extends Error {
 
 /** The sign-in expired or was refused: the user has to sign in again. */
 export class SignedOut extends Error {
-  constructor(message = 'Your sign-in expired. Please sign in again.') {
+  constructor(message = t('signedOut')) {
     super(message);
   }
 }
@@ -71,14 +74,19 @@ export function sleep(ms, signal) {
   });
 }
 
-/** Waits, and tells the user why when a job is running. */
+/**
+ * Waits, and tells the user why when a job is running. `reason` names the text in i18n.js; anything but a connection
+ * problem is the service asking the app to slow down, which the page explains.
+ */
 export async function pause(ms, reason, job, signal = job?.signal) {
   if (!job) return sleep(ms, signal);
-  job.note = `${reason}, continuing in ${Math.max(1, Math.ceil(ms / 1000))} s`;
+  job.note = t('wait.note', t(reason), Math.max(1, Math.ceil(ms / 1000)));
+  job.throttled = reason !== 'wait.connection';
   try {
     await sleep(ms, signal);
   } finally {
     job.note = '';
+    job.throttled = false;
   }
 }
 
@@ -155,7 +163,7 @@ function retryAfter(res) {
 /**
  * A JSON REST API called with the user's access token. It waits and retries when the service asks it to slow down
  * or has a hiccup, and asks for a fresh token once when the service says the token expired.
- * Options: base, name, token(force), slow and busy (what to tell the user while waiting),
+ * Options: base, name, token(force), slow and busy (the i18n.js names of what to tell the user while waiting),
  * throttled(status, data) for services that don't use 429, and before(cost, signal) to pace requests.
  */
 export class RestClient {
@@ -186,8 +194,8 @@ export class RestClient {
         data = parseJson(await res.text());
       } catch (e) {
         if (signal?.aborted) throw e;
-        if (attempt >= MAX_ATTEMPTS) throw new ServiceError(`Could not reach ${this.name}. Check your internet connection.`);
-        await pause(backoff(attempt), 'Connection problem', job, signal);
+        if (attempt >= MAX_ATTEMPTS) throw new ServiceError(t('net.unreachable', this.name));
+        await pause(backoff(attempt), 'wait.connection', job, signal);
         continue;
       }
       if (res.ok) return data;
@@ -203,7 +211,7 @@ export class RestClient {
         await pause(retryAfter(res) ?? backoff(attempt), throttled ? this.slow : this.busy, job, signal);
         continue;
       }
-      throw new ServiceError(`${this.name}: ${data?.error?.message || `answered ${res.status}.`}`, res.status);
+      throw new ServiceError(`${this.name}: ${data?.error?.message || t('net.answered', res.status)}`, res.status);
     }
   }
 }
@@ -365,7 +373,7 @@ export function mailPage(body, images = false, relay = false) {
     `<meta name="referrer" content="no-referrer"><base target="_blank"><style>${VIEWER_STYLE}</style>` +
     (relay ? `<script>${FRAME_RELAY}</script>` : '');
   const content = String(body.content ?? '');
-  if (!content.trim()) return head + '<p class="none">This mail has no text.</p>';
+  if (!content.trim()) return head + `<p class="none">${t('mail.noText')}</p>`;
   return head + (body.isHtml ? content.replace(/<meta[^>]+http-equiv\s*=\s*["']?refresh[^>]*>/gi, '') : `<pre>${esc(content)}</pre>`);
 }
 
@@ -416,7 +424,7 @@ export const currentJob = () => current;
  */
 async function startJob(kind, title, work) {
   if (current?.running) {
-    if (!current.background) throw new Error('Another operation is still running.');
+    if (!current.background) throw new Error(t('job.another'));
     current.preempted = true;
     current.cancel();
     await current.finished;
@@ -429,8 +437,8 @@ async function startJob(kind, title, work) {
       if (job.signal.aborted && isAbort(e)) {
         if (!job.preempted) {
           job.result = job.background
-            ? `${job.result} Stopped looking for unsubscribe links after ${fmt(job.done)} of ${fmt(job.total)} senders.`.trim()
-            : `Stopped after ${fmt(job.done)} of ${fmt(job.total)}.`;
+            ? t('job.stoppedLookup', job.result, fmt(job.done), fmt(job.total)).trim()
+            : t('job.stopped', fmt(job.done), fmt(job.total));
         }
       } else {
         job.error = e?.message || String(e);
@@ -446,7 +454,7 @@ async function startJob(kind, title, work) {
 
 /** Throws when an operation that needs the mailbox to itself is running. */
 function ensureIdle() {
-  if (current?.running && !current.background) throw new Error('Wait until the current operation finishes.');
+  if (current?.running && !current.background) throw new Error(t('busy'));
 }
 
 export function clearJob() {
@@ -461,9 +469,9 @@ const QUICK_LIMIT = 50;
 const ACTIONS = ['trash', 'delete', 'archive', 'read', 'unread'];
 
 function checkAction(action, service) {
-  if (!ACTIONS.includes(action)) throw new Error('Unknown action.');
-  if (action === 'delete' && !service.canDelete) throw new Error('This mailbox can only move mail to the trash.');
-  if (action === 'archive' && !service.canArchive) throw new Error('This mailbox has no Archive folder.');
+  if (!ACTIONS.includes(action)) throw new Error(t('action.unknown'));
+  if (action === 'delete' && !service.canDelete) throw new Error(t('action.noDelete'));
+  if (action === 'archive' && !service.canArchive) throw new Error(t('action.noArchive'));
 }
 
 /** Only the mails the action would change. */
@@ -471,21 +479,12 @@ const pending = (mails, action) =>
   action === 'read' ? mails.filter(m => !m.read) : action === 'unread' ? mails.filter(m => m.read) : mails;
 
 function progressText(action, n) {
-  if (action === 'archive') return `Archiving ${fmt(n)} mails`;
-  if (action === 'read' || action === 'unread') return `Marking ${fmt(n)} mails as ${action}`;
-  return `Removing ${fmt(n)} mails`;
+  const mails = plural(n, 'mail');
+  if (action === 'archive' || action === 'read' || action === 'unread') return t(`progress.${action}`, mails);
+  return t('progress.remove', mails);
 }
 
-function summaryText(action, done, trash) {
-  const mails = plural(done, 'mail');
-  return {
-    trash: `${mails} moved to ${trash}.`,
-    delete: `${mails} deleted.`,
-    archive: `${mails} archived.`,
-    read: `${mails} marked as read.`,
-    unread: `${mails} marked as unread.`,
-  }[action];
-}
+const summaryText = (action, done, trash) => tn(`done.${action}`, done, trash);
 
 const cleanList = values => [...new Set((values || []).map(v => String(v).trim().toLowerCase()).filter(v => v.includes('@')))];
 
@@ -515,17 +514,17 @@ export class Mailbox {
 
   scan(folderIds, checkSenders) {
     const targets = this.folders.filter(f => folderIds.includes(f.id));
-    if (!targets.length) throw new Error('Pick at least one folder to scan.');
+    if (!targets.length) throw new Error(t('scan.noFolder'));
     const service = this.provider;
-    return startJob('scan', 'Reading mail', async job => {
-      job.step(`Reading ${targets.map(f => f.name).join(', ')}`, targets.reduce((n, f) => n + f.total, 0));
+    return startJob('scan', t('scan.title'), async job => {
+      job.step(t('scan.reading', targets.map(f => f.name).join(', ')), targets.reduce((n, f) => n + f.total, 0));
       const found = new Map();
       const newest = new Map();
       let finished = false;
       try {
         await service.read(targets, (mail, info) => {
           if (found.has(mail.id)) return false;
-          mail.email ||= mail.name ? mail.name.toLowerCase() : '(unknown sender)';
+          mail.email ||= mail.name ? mail.name.toLowerCase() : t('unknownSender');
           found.set(mail.id, mail);
           const known = newest.get(mail.email);
           if (info && (!known || mail.t > known.t)) newest.set(mail.email, { t: mail.t, info });
@@ -539,15 +538,15 @@ export class Mailbox {
         this.scanned = targets;
         this.complete = finished;
       }
-      job.result = `Read ${plural(this.mails.length, 'mail')}.`;
+      job.result = tn('scan.result', this.mails.length);
       if (!checkSenders || service.scanFindsUnsubscribe) return;
       const todo = this.sendersToCheck();
       if (!todo.length) return;
       job.background = true;   // the table is usable now; starting any action stops this lookup
-      job.step('Looking for unsubscribe links', todo.length);
+      job.step(t('lookup.title'), todo.length);
       await this.#lookup(todo, job);
       const links = todo.filter(s => this.info.get(s.email)?.url || this.info.get(s.email)?.mailto).length;
-      job.result += ` ${fmt(links)} of the ${fmt(todo.length)} senders checked offer a way to unsubscribe.`;
+      job.result += tn('lookup.result', links, fmt(todo.length));
     });
   }
 
@@ -605,7 +604,7 @@ export class Mailbox {
         },
         reason => {
           failed++;
-          job?.fail('Some mails could not be changed: ' + reason);
+          job?.fail(t('apply.failed', reason));
         },
         job);
     } finally {
@@ -621,18 +620,18 @@ export class Mailbox {
     const targets = pending(mails, action);
     const emails = cleanList(unsubscribe);
     const blocked = service.canBlock ? cleanList(block) : [];
-    if (!targets.length && !emails.length && !blocked.length) throw new Error(action === 'read' ? 'Those mails are already read.' : 'Nothing to do.');
-    return startJob('clean', 'Cleaning up', async job => {
+    if (!targets.length && !emails.length && !blocked.length) throw new Error(action === 'read' ? t('clean.alreadyRead') : t('clean.nothing'));
+    return startJob('clean', t('clean.title'), async job => {
       const summary = [];
       if (blocked.length) {
-        job.step(`Updating ${service.blockName}`, 1);
+        job.step(t('block.updating', service.blockName), 1);
         try {
           const added = await service.block(blocked, job);
-          summary.push(`Blocked ${plural(added, 'new sender')}.`);
+          summary.push(tn('block.done', added));
           job.add(1);
         } catch (e) {
           if (!(e instanceof ServiceError)) throw e;
-          job.warning = `Could not update ${service.blockName}: ${e.message}`;
+          job.warning = t('block.failed', service.blockName, e.message);
         }
       }
       if (emails.length) summary.push(await this.unsubscribe(emails, job));
@@ -648,10 +647,10 @@ export class Mailbox {
   async unsubscribe(emails, job) {
     const unknown = this.latestMails(emails).filter(s => !this.info.has(s.email));
     if (unknown.length) {
-      job.step('Looking for unsubscribe links', unknown.length);
+      job.step(t('lookup.title'), unknown.length);
       await this.#lookup(unknown, job);
     }
-    job.step(`Unsubscribing from ${plural(emails.length, 'sender')}`, emails.length);
+    job.step(t('unsub.step', plural(emails.length, 'sender')), emails.length);
     let automatic = 0;
     let none = 0;
     await pool(emails, 6, async email => {
@@ -662,16 +661,16 @@ export class Mailbox {
       job.add(1);
     }, job.signal);
     const manual = job.manual.length;
-    return `Unsubscribed from ${plural(automatic, 'sender')}` +
-      (manual ? `, ${fmt(manual)} need you to open a link` : '') +
-      (none ? `, ${fmt(none)} offer no way to unsubscribe` : '') + '.';
+    return t('unsub.done', plural(automatic, 'sender')) +
+      (manual ? tn('unsub.manual', manual) : '') +
+      (none ? tn('unsub.noWay', none) : '') + '.';
   }
 
   /** A quick change to a few mails (the one in the viewer), done right away instead of as a job. */
   async act(mails, action) {
     checkAction(action, this.provider);
     ensureIdle();
-    if (mails.length > QUICK_LIMIT) throw new Error('Too many mails for a quick change.');
+    if (mails.length > QUICK_LIMIT) throw new Error(t('quick.tooMany'));
     return this.apply(pending(mails, action), action, null);
   }
 
@@ -679,9 +678,9 @@ export class Mailbox {
   emptyTrash() {
     const service = this.provider;
     const trash = service.trashName;
-    return startJob('trash', `Emptying ${trash}`, async job => {
+    return startJob('trash', t('trash.emptying', trash), async job => {
       const count = await service.emptyTrash(job);
-      job.result = count === 0 ? `${trash} was already empty.` : `Emptied ${trash}: ${plural(count, 'mail')} deleted.`;
+      job.result = count === 0 ? t('trash.wasEmpty', trash) : tn('trash.emptied', count, trash);
     });
   }
 

@@ -5,6 +5,7 @@
 // edition's shell (shell/ImapBridge.cs) through native.js. The website has no IMAP.
 
 import { ServiceError, SignedOut, chunks, parseUnsubscribe } from './mail.js';
+import { t } from './i18n.js';
 import { NATIVE, shell } from './native.js';
 
 const BATCH = 500;
@@ -25,7 +26,6 @@ export const bridgeState = () => (NATIVE ? bridge('state').catch(() => null) : P
 
 export class Imap {
   kind = 'imap';
-  trashName = 'Trash';
   blockName = '';
   canDelete = true;
   canBlock = false;   // IMAP has no standard for server-side rules
@@ -34,6 +34,10 @@ export class Imap {
 
   get canArchive() {
     return this.archiveId != null;
+  }
+
+  get trashName() {
+    return t('imap.trash');
   }
 
   async folders(signal) {
@@ -69,7 +73,7 @@ export class Imap {
             const d = applied.get(m.id);
             // Without UIDPLUS the server doesn't say the new UID; the mail can be acted on again after a scan.
             if (d) done(m, { id: d.newId || '', folderId: this.archiveId });
-            else failed('This folder changed since the scan. Scan again.');
+            else failed(t('imap.changed'));
           }
         } catch (e) {
           if (!(e instanceof ServiceError) || e.status === 400) throw e;
@@ -81,11 +85,11 @@ export class Imap {
   }
 
   block() {
-    throw new ServiceError("Blocking senders isn't available over IMAP.");
+    throw new ServiceError(t('imap.noBlock'));
   }
 
   async body(mail, signal) {
-    if (!mail.id) throw new ServiceError('Scan again to open this mail.');
+    if (!mail.id) throw new ServiceError(t('imap.scanAgain'));
     return { ...(await bridge('body', { id: mail.id }, signal)), webLink: null };
   }
 
@@ -94,7 +98,7 @@ export class Imap {
   }
 
   async emptyTrash(job) {
-    job.step('Emptying Trash', 1);
+    job.step(t('trash.emptying', this.trashName), 1);
     const { count } = await bridge('emptyTrash', {}, job.signal);
     job.add(1);
     return count;

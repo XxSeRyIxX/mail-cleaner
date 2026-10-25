@@ -40,7 +40,8 @@ internal sealed class SignIn : IDisposable
     public async Task<JsonObject> SignInAsync(SignInRequest req, CancellationToken ct)
     {
         bool google = IsGoogle(req.Provider);
-        if (string.IsNullOrWhiteSpace(req.ClientId)) throw new ApiException(400, "Set up the app registration first.");
+        if (string.IsNullOrWhiteSpace(req.ClientId))
+            throw new ApiException(400, Texts.L("Set up the app registration first.", "Configura antes el registro de la app."));
         string tenant = TenantOf(req.Tenant);
 
         // One sign-in waits for the browser at a time: a new one replaces it.
@@ -102,7 +103,8 @@ internal sealed class SignIn : IDisposable
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            throw new ApiException(408, "Mail Cleaner stopped waiting for your browser. Please sign in again.");
+            throw new ApiException(408, Texts.L("Mail Cleaner stopped waiting for your browser. Please sign in again.",
+                "Mail Cleaner dejó de esperar a tu navegador. Vuelve a iniciar sesión."));
         }
         finally
         {
@@ -169,15 +171,22 @@ internal sealed class SignIn : IDisposable
                 if (JsonNode.Parse(text) is JsonObject answer) return answer;
             }
             catch (JsonException) { }
-            return new JsonObject { ["error"] = "server_error", ["error_description"] = $"The sign-in service answered {(int)res.StatusCode}." };
+            return new JsonObject
+            {
+                ["error"] = "server_error",
+                ["error_description"] = Texts.L($"The sign-in service answered {(int)res.StatusCode}.",
+                    $"El servicio de inicio de sesión respondió {(int)res.StatusCode}."),
+            };
         }
         catch (HttpRequestException)
         {
-            throw new ApiException(503, "Couldn't reach the sign-in service. Check your internet connection.");
+            throw new ApiException(503, Texts.L("Couldn't reach the sign-in service. Check your internet connection.",
+                "No se pudo conectar con el servicio de inicio de sesión. Comprueba tu conexión a internet."));
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            throw new ApiException(504, "The sign-in service didn't answer. Please try again.");
+            throw new ApiException(504, Texts.L("The sign-in service didn't answer. Please try again.",
+                "El servicio de inicio de sesión no respondió. Inténtalo de nuevo."));
         }
     }
 
@@ -195,7 +204,7 @@ internal sealed class SignIn : IDisposable
     {
         "google" => true,
         "microsoft" => false,
-        _ => throw new ApiException(400, "Unknown sign-in service."),
+        _ => throw new ApiException(400, Texts.L("Unknown sign-in service.", "Servicio de inicio de sesión desconocido.")),
     };
 
     private static string TenantOf(string? tenant) =>
@@ -264,8 +273,10 @@ internal sealed class SignIn : IDisposable
                 }
                 answer.TrySetResult(query);
                 string page = query.ContainsKey("error")
-                    ? LoopbackHttp.MessagePage("The sign-in didn't finish", "Go back to Mail Cleaner to see why.")
-                    : LoopbackHttp.MessagePage("You're signed in", "Go back to Mail Cleaner. You can close this tab.");
+                    ? LoopbackHttp.MessagePage(Texts.L("The sign-in didn't finish", "El inicio de sesión no terminó"),
+                        Texts.L("Go back to Mail Cleaner to see why.", "Vuelve a Mail Cleaner para ver por qué."))
+                    : LoopbackHttp.MessagePage(Texts.L("You're signed in", "Has iniciado sesión"),
+                        Texts.L("Go back to Mail Cleaner. You can close this tab.", "Vuelve a Mail Cleaner. Puedes cerrar esta pestaña."));
                 await LoopbackHttp.WriteAsync(stream, "200 OK", "text/html; charset=utf-8", Encoding.UTF8.GetBytes(page));
             }
             _ = LoopbackHttp.ServeAsync(_v4, RespondAsync, ct);

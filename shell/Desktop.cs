@@ -13,7 +13,8 @@ internal static partial class Desktop
 {
     /// <summary>Opens a web or mailto link in the user's browser or mail app.</summary>
     public static void Open(string url) =>
-        OpenBrowser((SafeLink(url) ?? throw new ApiException(400, "Mail Cleaner only opens web and email links.")).AbsoluteUri);
+        OpenBrowser((SafeLink(url) ?? throw new ApiException(400,
+            Texts.L("Mail Cleaner only opens web and email links.", "Mail Cleaner solo abre enlaces web y de correo."))).AbsoluteUri);
 
     /// <summary>Web and mailto links only: any other scheme could start a program on this computer.</summary>
     internal static Uri? SafeLink(string? url) =>
@@ -28,14 +29,15 @@ internal static partial class Desktop
         }
         catch (Win32Exception e)
         {
-            throw new ApiException(500, $"Couldn't open your browser: {e.Message}");
+            throw new ApiException(500, Texts.L($"Couldn't open your browser: {e.Message}", $"No se pudo abrir tu navegador: {e.Message}"));
         }
     }
 
     /// <summary>Saves an export to the Downloads folder, as a browser would, next to any file of the same name.</summary>
     public static Saved Save(SaveRequest req)
     {
-        string name = SafeFileName(req.Name) ?? throw new ApiException(400, "That file name isn't allowed.");
+        string name = SafeFileName(req.Name)
+            ?? throw new ApiException(400, Texts.L("That file name isn't allowed.", "Ese nombre de archivo no está permitido."));
         string folder = DownloadsFolder();
         byte[] bytes = new UTF8Encoding(false).GetBytes(req.Text);
         for (int n = 0; ; n++)

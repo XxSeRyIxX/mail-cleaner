@@ -3,13 +3,15 @@
 
 // Outlook.com and Microsoft 365 mailboxes, through Microsoft Graph.
 
-import { RestClient, ServiceError, pool, pause, sleep, backoff, isTransient, parseUnsubscribe, fmt } from './mail.js';
+import { RestClient, ServiceError, pool, pause, sleep, backoff, isTransient, parseUnsubscribe, plural } from './mail.js';
+import { t } from './i18n.js';
 
 const GRAPH = 'https://graph.microsoft.com/v1.0/';
 const PAGE = 500;
 const READERS = 4;   // Outlook allows 4 concurrent requests per mailbox
-const SLOW = 'Microsoft asked this app to slow down';
-const BUSY = 'Microsoft is busy';
+const SLOW = 'outlook.slow';   // what to tell the user while waiting, by its i18n.js name
+const BUSY = 'outlook.busy';
+// Found again by these names, so they stay the same in every language.
 const RULE = 'Mail Cleaner: blocked senders';
 const OLD_RULE = 'Outlook Cleaner: blocked senders';   // the app's name before it handled Gmail
 const MAIL_FIELDS = 'id,from,subject,receivedDateTime,isRead,inferenceClassification,hasAttachments';
@@ -30,8 +32,6 @@ const enc = encodeURIComponent;
 
 export class Outlook {
   kind = 'outlook';
-  trashName = 'Deleted Items';
-  blockName = 'the Outlook block rule';
   canDelete = true;
   canBlock = true;
   scanFindsUnsubscribe = false;
@@ -46,6 +46,14 @@ export class Outlook {
 
   get canArchive() {
     return this.archiveId != null;
+  }
+
+  get trashName() {
+    return t('outlook.trash');
+  }
+
+  get blockName() {
+    return t('outlook.blockName');
   }
 
   /** Up to 20 requests in one JSON batch. Graph runs at most 4 of them at a time, Outlook's per-mailbox limit. */
@@ -249,11 +257,8 @@ export class Outlook {
       total: quota,
       used: sized ? nodes.reduce((n, x) => n + x.folder.size, 0) : null,
       parts: parts.map(t => ({ name: t.folder.name, size: sized ? t.size : null, count: t.count })),
-      trash: { name: trash?.folder.name ?? 'Deleted Items', size: sized ? trash?.size ?? 0 : null, count: trash?.count ?? 0 },
-      note: quota != null ? null
-        : personal ? "Microsoft doesn't tell apps your limit. Free outlook.com accounts get 15 GB for mail (more with Microsoft 365), " +
-          'and attachments also count toward your Microsoft cloud storage.'
-        : "Microsoft doesn't tell apps your limit: your organization sets it.",
+      trash: { name: trash?.folder.name ?? this.trashName, size: sized ? trash?.size ?? 0 : null, count: trash?.count ?? 0 },
+      note: quota != null ? null : personal ? t('outlook.notePersonal') : t('outlook.noteWork'),
       manageUrl: personal ? 'https://outlook.live.com/mail/0/options/general/storage' : 'https://outlook.office.com/mail/options/general/storage',
     };
   }
@@ -281,7 +286,7 @@ export class Outlook {
     const nodes = await this.allFolders(job.signal);
     const trashId = nodes.find(n => n.folder.wellKnown === 'deleteditems')?.folder.id;
     const folders = trashId ? nodes.filter(n => n.top === trashId).map(n => n.folder) : [];
-    job.step('Finding the mails in Deleted Items', folders.reduce((n, f) => n + f.total, 0));
+    job.step(t('trash.finding', this.trashName), folders.reduce((n, f) => n + f.total, 0));
     const ids = [];
     for (const folder of folders) {
       for (let url = `me/mailFolders/${enc(folder.id)}/messages?$select=id&$top=1000`; url; ) {
@@ -292,11 +297,11 @@ export class Outlook {
         url = page['@odata.nextLink'] || null;
       }
     }
-    job.step(`Deleting ${fmt(ids.length)} mails from Deleted Items`, ids.length);
+    job.step(t('trash.deleting', plural(ids.length, 'mail'), this.trashName), ids.length);
     let deleted = 0;
     await this.forEachBatch(ids, id => ({ method: 'DELETE', url: `/me/messages/${enc(id)}` }), (_, r) => {
       if (r.ok || r.status === 404) deleted++;
-      else job.fail('Some mails could not be deleted: ' + graphError(r.body));
+      else job.fail(t('trash.failed', graphError(r.body)));
     }, job);
     return deleted;
   }
@@ -310,7 +315,7 @@ function mailRequest(m, action) {
 }
 
 const withBody = (method, url, body) => ({ method, url, headers: { 'Content-Type': 'application/json' }, body });
-const graphError = body => body?.error?.message || 'Unknown error';
+const graphError = body => body?.error?.message || t('error.unknown');
 
 function parseMail(m, folderId) {
   const a = m.from?.emailAddress || {};

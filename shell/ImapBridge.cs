@@ -105,12 +105,14 @@ public sealed class ImapBridge(ImapConnection imap)
     public async Task<Applied> ApplyAsync(ApplyRequest req, CancellationToken ct)
     {
         var action = req.Action;
-        if (action is not ("trash" or "delete" or "archive" or "read" or "unread")) throw new ApiException(400, "Unknown action.");
+        if (action is not ("trash" or "delete" or "archive" or "read" or "unread"))
+            throw new ApiException(400, Texts.L("Unknown action.", "Acción desconocida."));
         if (action is "trash" or "archive" && trashId is null && archiveId is null) await AllFoldersAsync(ct);
         var target = action switch
         {
-            "trash" => trashId ?? throw new ApiException(400, "This mailbox has no Trash folder. Pick \"delete right away\" instead."),
-            "archive" => archiveId ?? throw new ApiException(400, "This mailbox has no Archive folder."),
+            "trash" => trashId ?? throw new ApiException(400, Texts.L("This mailbox has no Trash folder. Pick \"delete right away\" instead.",
+                "Este buzón no tiene carpeta Papelera. Elige «eliminarlos ya» en su lugar.")),
+            "archive" => archiveId ?? throw new ApiException(400, Texts.L("This mailbox has no Archive folder.", "Este buzón no tiene carpeta Archivo.")),
             _ => null,
         };
         var done = new List<AppliedMail>();
@@ -158,13 +160,15 @@ public sealed class ImapBridge(ImapConnection imap)
 
     public Task<MailBody> BodyAsync(BodyRequest req, CancellationToken ct)
     {
-        var id = ParseId(req.Id) ?? throw new ApiException(409, "Scan again to open this mail.");
+        var id = ParseId(req.Id) ?? throw new ApiException(409, Texts.L("Scan again to open this mail.", "Vuelve a analizar para abrir este correo."));
         return imap.RunAsync(async c =>
         {
             var folder = await OpenAsync(c, id.Folder, FolderAccess.ReadOnly, ct);
-            if (folder.UidValidity != id.Validity) throw new ApiException(409, "This folder changed since the scan. Scan again.");
+            if (folder.UidValidity != id.Validity)
+                throw new ApiException(409, Texts.L("This folder changed since the scan. Scan again.", "Esta carpeta cambió desde el análisis. Vuelve a analizarla."));
             var fields = new FetchRequest(MessageSummaryItems.UniqueId | MessageSummaryItems.Envelope | MessageSummaryItems.BodyStructure);
-            var summary = (await folder.FetchAsync([id.Uid], fields, ct)).FirstOrDefault() ?? throw new ApiException(404, "That mail is gone.");
+            var summary = (await folder.FetchAsync([id.Uid], fields, ct)).FirstOrDefault()
+                ?? throw new ApiException(404, Texts.L("That mail is gone.", "Ese correo ya no está."));
             var part = (BodyPart?)summary.HtmlBody ?? summary.TextBody;
             var text = part is null ? null : await folder.GetBodyPartAsync(id.Uid, part, ct) as TextPart;
             var envelope = summary.Envelope;
@@ -197,8 +201,9 @@ public sealed class ImapBridge(ImapConnection imap)
             usage ?? (sized ? folders.Sum(f => f.Size) : null),
             folders.OrderByDescending(f => f.Size).ThenByDescending(f => f.Total)
                 .Select(f => new StoragePart(f.Path, sized ? f.Size : null, f.Total)).ToList(),
-            new StoragePart(trash?.Path ?? "Trash", sized ? trash?.Size : null, trash?.Total ?? 0),
-            limit is null ? "Your mail server doesn't tell apps your storage limit." : null);
+            new StoragePart(trash?.Path ?? Texts.L("Trash", "Papelera"), sized ? trash?.Size : null, trash?.Total ?? 0),
+            limit is null ? Texts.L("Your mail server doesn't tell apps your storage limit.",
+                "Tu servidor de correo no les dice a las apps tu límite de almacenamiento.") : null);
     }
 
     public async Task<EmptiedTrash> EmptyTrashAsync(CancellationToken ct)

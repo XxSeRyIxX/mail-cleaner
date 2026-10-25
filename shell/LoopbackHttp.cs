@@ -96,7 +96,7 @@ internal static class LoopbackHttp
     /// <summary>A plain page for the app's messages outside its window. The texts are the app's own, never user input.</summary>
     internal static string MessagePage(string heading, params string[] paragraphs) => $"""
         <!doctype html>
-        <html lang="en">
+        <html lang="{Texts.Lang}">
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Mail Cleaner</title>

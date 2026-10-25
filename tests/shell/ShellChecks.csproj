@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../shell/Messages.cs" />
+    <Compile Include="../../shell/Texts.cs" />
     <Compile Include="../../shell/Errors.cs" />
     <Compile Include="../../shell/LoopbackHttp.cs" />
     <Compile Include="../../shell/SiteServer.cs" />

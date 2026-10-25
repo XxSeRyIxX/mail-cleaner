@@ -21,6 +21,10 @@ internal sealed class Commands(SignIn signIn, ImapStore store, ImapConnection co
                 return null;
             case "save":
                 return Node(Desktop.Save(Read(args, J.SaveRequest)), J.Saved);
+            case "lang":
+                Texts.Use(args.ValueKind == JsonValueKind.Object && args.TryGetProperty("lang", out JsonElement lang)
+                    && lang.ValueKind == JsonValueKind.String ? lang.GetString() : null);
+                return null;
 
             case "auth.signIn":
                 return await signIn.SignInAsync(Read(args, J.SignInRequest), ct);
@@ -58,12 +62,13 @@ internal sealed class Commands(SignIn signIn, ImapStore store, ImapConnection co
                 return Node(await imap.EmptyTrashAsync(ct), J.EmptiedTrash);
 
             default:
-                throw new ApiException(400, "Unknown command.");
+                throw new ApiException(400, Texts.L("Unknown command.", "Orden desconocida."));
         }
     }
 
     private static T Read<T>(JsonElement args, JsonTypeInfo<T> info) =>
-        args.ValueKind == JsonValueKind.Object && args.Deserialize(info) is { } value ? value : throw new ApiException(400, "Bad request.");
+        args.ValueKind == JsonValueKind.Object && args.Deserialize(info) is { } value ? value
+            : throw new ApiException(400, Texts.L("Bad request.", "Petición incorrecta."));
 
     private static JsonNode? Node<T>(T value, JsonTypeInfo<T> info) => JsonSerializer.SerializeToNode(value, info);
 }

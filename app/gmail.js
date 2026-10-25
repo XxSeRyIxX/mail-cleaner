@@ -3,7 +3,8 @@
 
 // Gmail mailboxes, through the Gmail API. Labels play the part of folders.
 
-import { RestClient, ServiceError, Pacer, pool, chunks, parseAddress, parseUnsubscribe, decodeWords, decodeText, base64Bytes, htmlText, fmt } from './mail.js';
+import { RestClient, ServiceError, Pacer, pool, chunks, parseAddress, parseUnsubscribe, decodeWords, decodeText, base64Bytes, htmlText, plural } from './mail.js';
+import { t } from './i18n.js';
 
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me/';
 // Google's storage quota is shared by Gmail, Drive and Photos, and only the Drive API reports it.
@@ -13,24 +14,26 @@ const ALL = 'ALL';
 const METADATA = 'format=metadata&metadataHeaders=From&metadataHeaders=Subject' +
   '&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Unsubscribe-Post' +
   '&fields=id%2ClabelIds%2CsizeEstimate%2CinternalDate%2Csnippet%2Cpayload(mimeType%2Cheaders)';
+// Gmail's own labels, named in the interface language when shown (i18n.js, gmail.INBOX and so on).
 const SYSTEM = [
-  ['INBOX', 'Inbox', 'inbox'],
-  ['SPAM', 'Spam', 'junkemail'],
-  [ALL, 'All mail', 'all'],
-  ['CATEGORY_PROMOTIONS', 'Promotions', null],
-  ['CATEGORY_SOCIAL', 'Social', null],
-  ['CATEGORY_UPDATES', 'Updates', null],
-  ['CATEGORY_FORUMS', 'Forums', null],
+  ['INBOX', 'inbox'],
+  ['SPAM', 'junkemail'],
+  [ALL, 'all'],
+  ['CATEGORY_PROMOTIONS', null],
+  ['CATEGORY_SOCIAL', null],
+  ['CATEGORY_UPDATES', null],
+  ['CATEGORY_FORUMS', null],
 ];
 const LABELS = { trash: [['TRASH'], []], archive: [[], ['INBOX']], read: [[], ['UNREAD']], unread: [['UNREAD'], []] };
+// Requests in flight at once. Google also turns away an account with too many open requests ("Too many concurrent
+// requests for user"), and at Gmail's pace a few are enough.
+const CONCURRENT = 4;
 const enc = encodeURIComponent;
 const num = v => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));   // Google sends 64-bit numbers as strings
 const headerOf = (part, name) => (part.headers || []).find(h => (h.name || '').toLowerCase() === name)?.value || '';
 
 export class Gmail {
   kind = 'gmail';
-  trashName = 'Trash';
-  blockName = 'the Gmail filters';
   canDelete = true;
   canArchive = true;
   canBlock = true;
@@ -39,24 +42,34 @@ export class Gmail {
   /** `auth` is the Google sign-in: token(force), and user, the Gmail address for links to Gmail. */
   constructor(auth) {
     this.auth = auth;
-    // Google allows each user 250 quota units a second, and reading one mail costs 5. Stay a bit under that.
-    const pacer = new Pacer(200, 200);
+    // Google gives each user 6,000 quota units a minute (projects that used the Gmail API before May 2026 keep their
+    // older, higher quota), and reading one mail's headers costs 20. Stay a bit under that, so Google seldom has to
+    // ask the app to wait.
+    const pacer = new Pacer(90, 300);
     this.api = new RestClient({
       base: GMAIL,
       name: 'Gmail',
       token: force => auth.token(force),
-      slow: 'Google asked this app to slow down',
-      busy: 'Gmail is busy',
+      slow: 'gmail.slow',
+      busy: 'gmail.busy',
       throttled: (status, data) => status === 403 && (data?.error?.errors || []).some(e => /rateLimitExceeded/.test(e.reason)),
       before: (cost, signal) => pacer.take(cost, signal),
     });
+  }
+
+  get trashName() {
+    return t('gmail.trash');
+  }
+
+  get blockName() {
+    return t('gmail.blockName');
   }
 
   async folders(signal) {
     const { labels = [] } = await this.api.get('labels', { signal });
     const user = labels.filter(l => l.type === 'user').sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     const counts = new Map();
-    await pool([...SYSTEM.filter(([id]) => id !== ALL).map(([id]) => id), ...user.map(l => l.id)], 8, async id => {
+    await pool([...SYSTEM.filter(([id]) => id !== ALL).map(([id]) => id), ...user.map(l => l.id)], CONCURRENT, async id => {
       try {
         const label = await this.api.get(`labels/${enc(id)}`, { signal });
         counts.set(id, { total: label.messagesTotal || 0, unread: label.messagesUnread || 0 });
@@ -66,9 +79,11 @@ export class Gmail {
     }, signal);
     const profile = await this.api.get('profile', { signal });
     const result = [];
-    for (const [id, name, wellKnown] of SYSTEM) {
-      if (id === ALL) result.push({ id, name, path: name, total: profile.messagesTotal || 0, unread: 0, size: 0, wellKnown });
-      else if (counts.has(id)) result.push({ id, name, path: name, ...counts.get(id), size: 0, wellKnown });
+    for (const [id, wellKnown] of SYSTEM) {
+      // Getters, so the name follows the interface language.
+      const folder = { id, get name() { return t(`gmail.${id}`); }, get path() { return t(`gmail.${id}`); }, size: 0, wellKnown };
+      if (id === ALL) result.push(Object.assign(folder, { total: profile.messagesTotal || 0, unread: 0 }));
+      else if (counts.has(id)) result.push(Object.assign(folder, counts.get(id)));
     }
     for (const l of user) {
       if (counts.has(l.id)) result.push({ id: l.id, name: l.name.split('/').pop(), path: l.name.replaceAll('/', ' / '), ...counts.get(l.id), size: 0, wellKnown: null });
@@ -88,7 +103,7 @@ export class Gmail {
 
   /** A mail's headers, as a scanned mail and its unsubscribe info. */
   async metadata(id, folderId, job) {
-    return parseMessage(await this.api.get(`messages/${enc(id)}?${METADATA}`, { job, cost: 5 }), folderId);
+    return parseMessage(await this.api.get(`messages/${enc(id)}?${METADATA}`, { job, cost: 20 }), folderId);
   }
 
   async read(folders, found, job) {
@@ -99,7 +114,7 @@ export class Gmail {
       for await (const listed of this.list(params, job)) {
         const fresh = listed.filter(id => !seen.has(id) && seen.add(id));
         job.add(listed.length - fresh.length);
-        await pool(fresh, 16, async id => {
+        await pool(fresh, CONCURRENT, async id => {
           try {
             const { mail, info } = await this.metadata(id, folder.id, job);
             found(mail, info);
@@ -113,7 +128,7 @@ export class Gmail {
   }
 
   lookup(senders, found, job) {
-    return pool(senders, 8, async s => {
+    return pool(senders, CONCURRENT, async s => {
       try {
         found(s.email, (await this.metadata(s.id, '', job)).info);
       } catch (e) {
@@ -146,9 +161,9 @@ export class Gmail {
   }
 
   trashEach(mails, done, failed, job) {
-    return pool(mails, 8, async m => {
+    return pool(mails, CONCURRENT, async m => {
       try {
-        await this.api.send('POST', `messages/${enc(m.id)}/trash`, { job, cost: 5 });
+        await this.api.send('POST', `messages/${enc(m.id)}/trash`, { job, cost: 20 });
         done(m);
       } catch (e) {
         if (!(e instanceof ServiceError)) throw e;
@@ -165,7 +180,7 @@ export class Gmail {
       await this.api.send('POST', 'messages/batchDelete', { body: { ids }, job, cost: 50 });
     } catch (e) {
       if (e instanceof ServiceError && e.status === 403) {
-        throw new ServiceError("Gmail didn't allow deleting mail for good. Sign out, sign in again and allow everything Google asks about.", 403);
+        throw new ServiceError(t('gmail.noDelete'), 403);
       }
       throw e;
     }
@@ -196,7 +211,7 @@ export class Gmail {
   }
 
   async body(mail, signal) {
-    const m = await this.api.get(`messages/${enc(mail.id)}?format=full`, { signal, cost: 5 });
+    const m = await this.api.get(`messages/${enc(mail.id)}?format=full`, { signal, cost: 60 });
     const payload = m.payload || {};
     const header = name => decodeWords(headerOf(payload, name));
     const html = findPart(payload, 'text/html');
@@ -213,39 +228,37 @@ export class Gmail {
 
   async decodePart(mailId, part, signal) {
     let data = part.body?.data;
-    if (!data) data = (await this.api.get(`messages/${enc(mailId)}/attachments/${enc(part.body.attachmentId)}`, { signal, cost: 5 })).data || '';
+    if (!data) data = (await this.api.get(`messages/${enc(mailId)}/attachments/${enc(part.body.attachmentId)}`, { signal, cost: 20 })).data || '';
     const type = headerOf(part, 'content-type');
     return decodeText(base64Bytes(data), /charset\s*=\s*"?([^";\s]+)/i.exec(type)?.[1] || 'utf-8');
   }
 
   async storage(signal) {
     const label = await this.api.get('labels/TRASH', { signal });
-    const trash = { name: 'Trash', size: null, count: label.messagesTotal || 0 };
+    const trash = { name: this.trashName, size: null, count: label.messagesTotal || 0 };
     try {
       const { storageQuota: q = {} } = await this.api.get(ABOUT, { signal });
       const used = num(q.usage);
       const drive = num(q.usageInDrive) ?? 0;
       const parts = used == null ? []
-        : [{ name: 'Gmail and Google Photos', size: Math.max(0, used - drive), count: null }, { name: 'Google Drive', size: drive, count: null }];
+        : [{ name: t('gmail.photos'), size: Math.max(0, used - drive), count: null }, { name: 'Google Drive', size: drive, count: null }];
       return { total: num(q.limit), used, parts, trash, note: null, manageUrl: MANAGE };   // no limit: unlimited storage
     } catch (e) {
       if (!(e instanceof ServiceError && [400, 403, 404].includes(e.status))) throw e;
-      const note = /scope/i.test(e.message)
-        ? 'To see your total Google storage here, sign out, sign in again and allow the app to see your Google Drive storage.'
-        : "Google didn't share your total storage: the Google Drive API is off in the app's Google Cloud project.";
+      const note = /scope/i.test(e.message) ? t('gmail.noteScope') : t('gmail.noteApi');
       return { total: null, used: null, parts: [], trash, note, manageUrl: MANAGE };
     }
   }
 
   async emptyTrash(job) {
     const label = await this.api.get('labels/TRASH', { job });
-    job.step('Finding the mails in Trash', label.messagesTotal || 0);
+    job.step(t('trash.finding', this.trashName), label.messagesTotal || 0);
     const ids = [];
     for await (const listed of this.list({ labelIds: 'TRASH', includeSpamTrash: true }, job)) {
       ids.push(...listed);
       job.add(listed.length);
     }
-    job.step(`Deleting ${fmt(ids.length)} mails from Trash`, ids.length);
+    job.step(t('trash.deleting', plural(ids.length, 'mail'), this.trashName), ids.length);
     for (const chunk of chunks(ids, 1000)) {
       await this.deleteForGood(chunk, job);
       job.add(chunk.length);

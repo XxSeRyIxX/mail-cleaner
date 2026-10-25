@@ -22,11 +22,11 @@ internal static class Errors
     /// <summary>The status and message the page gets for a failed request. 401 sends it back to the sign-in.</summary>
     public static (int Status, string Message) Explain(Exception e) => e switch
     {
-        OperationCanceledException => (499, "Stopped."),
+        OperationCanceledException => (499, Texts.L("Stopped.", "Detenido.")),
         NotSignedInException => (401, e.Message),
         ApiException a => (a.Status, a.Message),
-        MailServerException => (502, "Mail server: " + e.Message),
-        JsonException => (400, "Bad request."),
+        MailServerException => (502, Texts.L("Mail server: ", "Servidor de correo: ") + e.Message),
+        JsonException => (400, Texts.L("Bad request.", "Petición incorrecta.")),
         _ => (500, e.Message),
     };
 }

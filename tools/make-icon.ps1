@@ -118,4 +118,34 @@ $w.Flush()
 [IO.File]::WriteAllBytes((Join-Path $out 'icon.ico'), $ico.ToArray())
 $w.Dispose()
 
-'icon.ico written to shell/, icon.png written to app/'
+# The website's link preview (og:image in index.html), also the repository's social preview.
+function New-Social {
+    $width = 1280; $height = 640
+    $bmp = New-Object Drawing.Bitmap $width, $height
+    $g = [Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $g.TextRenderingHint = [Drawing.Text.TextRenderingHint]::AntiAliasGridFit
+    $g.FillRectangle((New-Object Drawing.Drawing2D.LinearGradientBrush (P 0 0), (P $width $height), (Rgb '#123A38'), (Rgb '#0C1113')), 0, 0, $width, $height)
+    $logo = New-Logo 270
+    $g.DrawImage($logo, 100, 185, 270, 270)
+    $logo.Dispose()
+
+    $px = [Drawing.GraphicsUnit]::Pixel
+    $g.DrawString('Mail Cleaner', (New-Object Drawing.Font 'Segoe UI Semibold', 78, ([Drawing.FontStyle]::Regular), $px), (New-Object Drawing.SolidBrush (Rgb '#E8EAEF')), 430, 120)
+    $g.DrawString("Find the senders that flood your inbox, then`nunsubscribe, delete or archive them in bulk.",
+        (New-Object Drawing.Font 'Segoe UI', 31, ([Drawing.FontStyle]::Regular), $px), (New-Object Drawing.SolidBrush (Rgb '#A9B3C1')), (New-Object Drawing.RectangleF 436, 236, 800, 100))
+    $teal = New-Object Drawing.SolidBrush (Rgb '#2DD4BF')
+    $g.FillRectangle($teal, 440, 372, 64, 4)
+    $g.DrawString('Outlook  ·  Gmail  ·  IMAP', (New-Object Drawing.Font 'Segoe UI Semibold', 28, ([Drawing.FontStyle]::Regular), $px), (New-Object Drawing.SolidBrush (Rgb '#E8EAEF')), 434, 396)
+    $g.DrawString('Runs on your device: no server, no sign-up, free.', (New-Object Drawing.Font 'Segoe UI', 25, ([Drawing.FontStyle]::Regular), $px), (New-Object Drawing.SolidBrush (Rgb '#A9B3C1')), 436, 444)
+    $g.DrawString('xxseryixx.github.io/mail-cleaner', (New-Object Drawing.Font 'Segoe UI', 25, ([Drawing.FontStyle]::Regular), $px), $teal, 436, 500)
+    $g.Dispose()
+    return $bmp
+}
+
+$social = New-Social
+$social.Save((Join-Path $web 'social.png'), [Drawing.Imaging.ImageFormat]::Png)
+$social.Dispose()
+
+'icon.ico written to shell/, icon.png and social.png written to app/'

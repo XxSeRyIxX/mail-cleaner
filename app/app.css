@@ -18,6 +18,8 @@
   --ok-soft: #e6f4ea;
   --radius: 12px;
   --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 1px 3px rgba(16, 24, 40, .08);
+  /* Text on --brand and --danger. */
+  --on-color: #fff;
   color-scheme: light dark;
 }
 
@@ -40,13 +42,17 @@
     --ok: #5fd08a;
     --ok-soft: #15301f;
     --shadow: none;
+    /* The dark theme's colours are light: white on them can't be read. */
+    --on-color: #0e1116;
   }
 }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-/* index.html marks the desktop edition before the first paint; it boots until the app shows a view. */
+/* The page boots (index.html) until the app shows a view, hidden meanwhile so nothing jumps while it is filled in and
+   translated. index.html also marks the desktop edition before the first paint. */
 .desktop [data-only="web"], .booting #view-connect { display: none !important; }
+.booting main, .booting .footer { visibility: hidden; }
 .no-sizes .size-only { display: none !important; }
 
 body {
@@ -109,9 +115,9 @@ main { max-width: 1680px; margin: 0 auto; padding: 20px 24px 60px; }
 }
 .btn:hover:not(:disabled) { background: var(--hover); }
 .btn:disabled { opacity: .5; cursor: default; }
-.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: var(--on-color); }
 .btn.primary:hover:not(:disabled) { background: var(--brand-hover); }
-.btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: var(--on-color); }
 .btn.danger:hover:not(:disabled) { background: var(--danger-hover); }
 .btn.ghost { background: transparent; }
 .btn.small { padding: 3px 10px; font-size: 12.5px; }
@@ -177,6 +183,7 @@ a.brand { color: inherit; text-decoration: none; }
 .seg button { border: none; background: var(--card); color: var(--muted); font: inherit; font-weight: 600; padding: 6px 12px; cursor: pointer; }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button.on { background: var(--brand-soft); color: var(--brand); }
+.seg.small button { padding: 3px 9px; font-size: 12.5px; }
 
 .filters { display: grid; gap: 10px; padding: 12px; border-radius: 10px; background: var(--hover); }
 .filter { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }

@@ -3,6 +3,8 @@
 
 // About: credits, the license notice, and where this copy comes from.
 
+import { t } from './i18n.js';
+
 /** The original project. Section 7(b) of the license asks copies to keep this attribution (see NOTICE). */
 const ORIGINAL = {
   name: 'Mail Cleaner',
@@ -35,32 +37,43 @@ function readWatermarks(text) {
   });
 }
 
+/** The deployed build and version from config.json, once initAbout has them. */
+const deployed = { build: '', version: '' };
+
+/** The links, and the About texts that name this copy, in the interface language. Again after the language changes. */
+export function fillAbout() {
+  for (const a of document.querySelectorAll('[data-link]')) a.href = LINKS[a.dataset.link];
+  const $ = selector => document.querySelector(selector);
+  $('#ab-copy').hidden = ORIGINAL.hosts.includes(location.hostname);
+  $('#ab-copy').textContent = t('about.copy', location.host, ORIGINAL.name, ORIGINAL.repo);
+  const { build, version } = deployed;
+  $('#ab-version').hidden = !build;
+  if (build) {
+    $('#ab-deployed').textContent = version ? t('about.version', version, build) : t('about.build', build);
+    $('#ab-deployed').href = `${ORIGINAL.repo}/commit/${build}`;
+  }
+}
+
 /** Fills in the About dialog and its links, and opens it from [data-about] buttons. `build` and `version` come from config.json. */
 export function initAbout({ build, version } = {}) {
   const dialog = document.getElementById('about');
   const $ = selector => dialog.querySelector(selector);
-  for (const a of document.querySelectorAll('[data-link]')) a.href = LINKS[a.dataset.link];
+  Object.assign(deployed, { build, version });
+  fillAbout();
   $('#ab-made').append(watermark());
   const original = ORIGINAL.hosts.includes(location.hostname);
-  $('#ab-copy').hidden = original;
-  $('#ab-copy').textContent = `This copy runs on ${location.host}. The original ${ORIGINAL.name} is free and open source: ${ORIGINAL.repo}`;
-  $('#ab-version').hidden = !build;
-  if (build) {
-    $('#ab-deployed').textContent = version ? `Version ${version} (${build})` : `Version ${build}`;
-    $('#ab-deployed').href = `${ORIGINAL.repo}/commit/${build}`;
-  }
   $('#ab-check').addEventListener('input', e => {
     const found = readWatermarks(e.target.value);
     $('#ab-found').textContent = !e.target.value ? ''
-      : !found.length ? 'No build id hidden in that text.'
-      : found.map(id => (id === ORIGINAL.build ? `${id}: this app's build id` : `${id}: another build id`)).join(', ');
+      : !found.length ? t('about.noId')
+      : found.map(id => t(id === ORIGINAL.build ? 'about.ours' : 'about.other', id)).join(', ');
   });
 
   const open = proof => {
     $('#ab-proof').hidden = !proof;
     if (proof) {
       $('#ab-id').textContent = ORIGINAL.build;
-      $('#ab-where').textContent = `${location.origin}${original ? '' : ': not an address of the original'}`;
+      $('#ab-where').textContent = location.origin + (original ? '' : t('about.notOriginal'));
     }
     if (!dialog.open) dialog.showModal();
   };

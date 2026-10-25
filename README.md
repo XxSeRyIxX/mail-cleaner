@@ -35,6 +35,7 @@ In both editions the mail never goes through a server of ours: the page talks to
   - **Block**: Outlook gets one rule, *Mail Cleaner: blocked senders*, that sends their future mail straight to Deleted Items. Gmail gets filters that send it to Trash. IMAP has no standard for server rules, so blocking isn't offered there.
   - Shortcuts: **Remove all** likely spam, **Empty Junk** or **Empty Spam**, and the **Remove list** (addresses or whole `@domains`, saved in your browser for next time).
 - **Let an AI choose.** **Export for AI** builds a Markdown summary of your senders for ChatGPT, Copilot, Gemini or any AI chat (copy it, or download it as a `.md` file to attach). **Paste AI answer** reads the addresses and `@domains` from the AI's code block and shows them with checkboxes before anything is added to the remove list. The same window downloads CSV files of your senders or of every mail (the desktop edition saves them in your Downloads folder).
+- **English and Spanish.** **EN / ES** in the top bar switches the whole app, the text for the AI and the privacy policy included; the first visit follows the browser's language. The CSV columns stay the same in both, for other programs.
 
 ## Use it
 
@@ -121,7 +122,7 @@ If the review pushes back on full mail access, the app could ask for `gmail.modi
 
 **Outlook.** Microsoft lets an app make 4 requests at a time and about 10,000 per 10 minutes on a mailbox, and personal outlook.com mailboxes often get less. Scanning reads 500 mails per request. Unsubscribe lookups cost one request per sender and changes one request per mail, sent in batches of 20, so big jobs reach the limit: the app then shows *Microsoft asked this app to slow down, continuing in N s*, waits and slows its own pace. **Empty Deleted Items** also deletes one mail per request, about 1,000 a minute; Outlook's own *Empty folder* is instant.
 
-**Gmail.** Google allows 250 quota units per second per user; reading one mail costs 5. The app stays a bit under that, so a scan reads about 40 mails a second (10,000 mails in about 4 minutes). Cleanups and Empty Trash handle 1,000 mails per request.
+**Gmail.** Google gives an app 6,000 quota units a minute per user, and reading one mail's headers costs 20 (a whole mail, 60), so about 300 mails a minute. The app stays a bit under that, 4 requests at a time, so a scan reads about 270 mails a minute (10,000 mails in under 40 minutes) and Google seldom has to ask it to wait. Google projects that used the Gmail API between November 2025 and April 2026 keep their older, higher quota; the app paces them the same way. Cleanups and Empty Trash handle 1,000 mails per request.
 
 **IMAP.** One connection, 500 mails per request, so scans usually take seconds to a minute or two. Moves, flags and deletes go 500 at a time, and Empty Trash is two commands whatever its size.
 
@@ -184,7 +185,8 @@ The saved IMAP login (`imap_login.bin`) is kept. The old token caches (`msal_cac
 | `app/index.html`, `app.css` | The page and its Content Security Policy |
 | `app/app.js` | The interface: connect, scan, filters, grouping, viewer, cleanup dialogs, AI export and import, and the desktop edition's links and exports |
 | `app/about.js` | The About dialog: credits, license notice, links and the version |
-| `app/privacy.html` | The privacy policy, which the app also shows in a dialog |
+| `app/i18n.js` | The interface in English and Spanish: the scripts' texts, and the Spanish for the page's |
+| `app/privacy.html`, `privacy.es.html` | The privacy policy in English and Spanish, which the app also shows in a dialog |
 | `app/mail.js` | What every service shares: jobs, pacing and retries, header parsing, one-click unsubscribe, the mail viewer page, the scanned mailbox and the cleanup steps |
 | `app/auth.js` | Sign-in: Microsoft (authorization code with PKCE, as a single-page app) and Google (Google Identity Services) on the website, both through the shell on the desktop |
 | `app/outlook.js` | Outlook through Microsoft Graph: folders, scan, unsubscribe lookup, actions in JSON batches, block rule, bodies, storage, Empty Deleted Items |
@@ -194,6 +196,7 @@ The saved IMAP login (`imap_login.bin`) is kept. The old token caches (`msal_cac
 | `app/config.json` | Default app registrations (empty in the repository; the workflows fill it in) |
 | `shell/Program.cs` | Desktop edition: the Photino window, the page's files and the messages |
 | `shell/Commands.cs`, `Messages.cs`, `Errors.cs` | The commands the page can send, their JSON types and their errors |
+| `shell/Texts.cs` | The shell's own messages in the page's language |
 | `shell/SignIn.cs` | Signing in to Microsoft and Google in the user's browser, with a loopback redirect and PKCE |
 | `shell/SiteServer.cs`, `LoopbackHttp.cs` | The page's files, and the small loopback server for macOS and Linux |
 | `shell/Desktop.cs` | Opening links in the user's browser and saving exports to Downloads |
@@ -202,7 +205,7 @@ The saved IMAP login (`imap_login.bin`) is kept. The old token caches (`msal_cac
 | `shell/ImapServers.cs` | Finds the IMAP server for an address: known services, then Thunderbird's database |
 | `tests/` | Node tests for the web modules, and `tests/shell`, checks for the desktop services |
 | `MailCleaner.slnx` | The desktop edition and its checks, for `dotnet build MailCleaner.slnx` |
-| `tools/make-icon.ps1` | Draws `shell/icon.ico` and `app/icon.png` |
+| `tools/make-icon.ps1` | Draws `shell/icon.ico`, `app/icon.png` and the link preview `app/social.png` |
 | `.github/workflows/` | `checks.yml` (tests on Windows, macOS and Linux), `pages.yml` (the website), `build.yml` (desktop builds and releases) |
 | `.github/write-config.ps1` | Fills in `app/config.json` for both workflows: default app registrations, the commit and the version |
 | `LICENSE`, `NOTICE` | The GNU AGPL v3, the additional attribution term and third-party notices |

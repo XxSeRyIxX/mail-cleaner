@@ -8,6 +8,7 @@
 // to Microsoft or Google. The app registrations are public IDs, never secrets.
 
 import { SignedOut, base64Bytes, storage } from './mail.js';
+import { t } from './i18n.js';
 import { NATIVE, shell } from './native.js';
 
 const tab = storage(sessionStorage);
@@ -89,17 +90,14 @@ const CONSUMERS = '9188040d-6c67-4c5b-b112-36a304b66dad';   // the tenant of out
 /** Microsoft's sign-in errors, turned into the step that fixes them. */
 function explain(error, description) {
   const text = String(description || '').split(/\r?\n/)[0];
-  const fix = 'In entra.microsoft.com, open App registrations, your app, Authentication: add the platform ' + (NATIVE
-    ? `Mobile and desktop applications with the redirect URI ${DESKTOP_REDIRECT}.`
-    : `Single-page application with the redirect URI ${appUrl()} and remove that address from Web or Mobile and desktop, if it's there.`);
-  const us = NATIVE ? 'Mail Cleaner' : 'this page';
+  const fix = t('auth.fix', NATIVE ? t('auth.fixDesktop', DESKTOP_REDIRECT) : t('auth.fixWeb', appUrl()));
   if (/AADSTS9002326|AADSTS9002327|AADSTS90023\b|AADSTS7000218|AADSTS70002\b/.test(text)) {
-    return `Your app registration doesn't treat ${NATIVE ? 'Mail Cleaner as a desktop app' : 'this page as a single-page app'}. ${fix}`;
+    return t(NATIVE ? 'auth.notDesktop' : 'auth.notSpa', fix);
   }
-  if (/AADSTS50011/.test(text)) return `The address of ${us} isn't a redirect URI of your app registration. ${fix}`;
-  if (/AADSTS700016/.test(text)) return 'Microsoft doesn\'t know that Application (client) ID, or the app only accepts its own organization. Check the ID and the supported account types.';
-  if (error === 'access_denied' || error === 'consent_required') return 'The sign-in was cancelled, or access to your mail wasn\'t allowed.';
-  return `Microsoft stopped the sign-in: ${error || 'unknown error'}. ${text}`.trim();
+  if (/AADSTS50011/.test(text)) return t(NATIVE ? 'auth.redirectDesktop' : 'auth.redirectWeb', fix);
+  if (/AADSTS700016/.test(text)) return t('auth.unknownId');
+  if (error === 'access_denied' || error === 'consent_required') return t('auth.deniedMail');
+  return t('auth.msStopped', error || t('error.unknown'), text).trim();
 }
 
 export class Microsoft extends SignIn {
@@ -145,7 +143,7 @@ export class Microsoft extends SignIn {
     history.replaceState(null, '', location.pathname + location.search);   // keep the code out of the address bar and history
     const pending = tab.get(MS_PENDING);
     tab.remove(MS_PENDING);
-    if (!pending || reply.get('state') !== pending.state) throw new Error('That sign-in reply wasn\'t for this page. Please sign in again.');
+    if (!pending || reply.get('state') !== pending.state) throw new Error(t('auth.wrongReply'));
     if (reply.has('error')) throw new Error(explain(reply.get('error'), reply.get('error_description')));
     const ms = new Microsoft(pending);
     await ms.redeem({ grant_type: 'authorization_code', code: reply.get('code') || '', redirect_uri: pending.redirectUri, code_verifier: pending.verifier });
@@ -157,7 +155,7 @@ export class Microsoft extends SignIn {
     try {
       res = await fetch(this.endpoint('token'), { method: 'POST', body: new URLSearchParams({ client_id: this.clientId, scope: MS_SCOPES, ...fields }) });
     } catch {
-      throw new Error('Couldn\'t reach Microsoft\'s sign-in service. Check your internet connection.');
+      throw new Error(t('auth.msUnreachable'));
     }
     this.accept(await res.json().catch(() => ({})), fields.grant_type === 'refresh_token');
   }
@@ -228,7 +226,7 @@ function loadGis() {
     script.onerror = () => {
       gisLoading = null;
       script.remove();
-      reject(new Error('Couldn\'t load Google\'s sign-in. Check your internet connection, or allow accounts.google.com in your ad blocker.'));
+      reject(new Error(t('auth.gisFailed')));
     };
     document.head.append(script);
   });
@@ -236,23 +234,21 @@ function loadGis() {
 }
 
 function googleError(error, description) {
-  if (error === 'popup_closed') return 'The Google window was closed before the sign-in finished.';
-  if (error === 'popup_failed_to_open') return 'Your browser blocked Google\'s sign-in window. Allow pop-ups for this page and try again.';
-  if (error === 'access_denied') return 'The sign-in was cancelled, or access to Gmail wasn\'t allowed.';
-  if (error === 'invalid_client' || /client_secret/i.test(description)) {
-    return 'Google doesn\'t accept that client ID and secret. Check that the client is a Desktop app and copy both again.';
-  }
-  return `Google stopped the sign-in: ${error}${description ? `. ${description}` : ''}`;
+  if (error === 'popup_closed') return t('auth.popupClosed');
+  if (error === 'popup_failed_to_open') return t('auth.popupBlocked');
+  if (error === 'access_denied') return t('auth.deniedGmail');
+  if (error === 'invalid_client' || /client_secret/i.test(description)) return t('auth.badSecret');
+  return t('auth.googleStopped', error, description ? `. ${description}` : '');
 }
 
-const MISSING_SCOPES = 'Google asked which permissions to allow and not all were ticked. Sign in again and allow reading, ' +
-  'changing and deleting your mail, and managing your filters (used to block senders).';
+/** Google asked which permissions to allow and not all were ticked. */
+const missingScopes = () => new Error(t('auth.scopes'));
 
 /** The signed-in Gmail address. */
 async function gmailAddress(token) {
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', { headers: { Authorization: `Bearer ${token}` } });
   const profile = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error('Gmail: ' + (profile.error?.message || `answered ${res.status}.`));
+  if (!res.ok) throw new Error('Gmail: ' + (profile.error?.message || t('net.answered', res.status)));
   return profile.emailAddress || '';
 }
 
@@ -283,7 +279,7 @@ class Google extends SignIn {
     this.waiting = null;
     if (!waiting) return;
     if (r.error) waiting.reject(new Error(googleError(r.error, r.error_description)));
-    else if (!google.accounts.oauth2.hasGrantedAllScopes(r, MAIL_SCOPE, FILTER_SCOPE)) waiting.reject(new Error(MISSING_SCOPES));
+    else if (!google.accounts.oauth2.hasGrantedAllScopes(r, MAIL_SCOPE, FILTER_SCOPE)) waiting.reject(missingScopes());
     else waiting.resolve(r);
   }
 
@@ -291,10 +287,10 @@ class Google extends SignIn {
   request(prompt) {
     return new Promise((resolve, reject) => {
       if (!this.client) {
-        reject(new Error('Google\'s sign-in is still loading. Try again in a moment.'));
+        reject(new Error(t('auth.loading')));
         return;
       }
-      this.waiting?.reject(new Error('Replaced by a newer sign-in.'));
+      this.waiting?.reject(new Error(t('auth.replaced')));
       this.waiting = { resolve, reject };
       this.client.requestAccessToken(this.session?.user ? { prompt, login_hint: this.session.user } : { prompt });
     });
@@ -342,7 +338,7 @@ class DesktopGoogle extends SignIn {
   async signIn(signal) {
     const answer = this.check(await shell('auth.signIn', { provider: 'google', clientId: this.clientId, secret: this.secret }, signal));
     const granted = String(answer.scope || '').split(' ');
-    if (![MAIL_SCOPE, FILTER_SCOPE].every(scope => granted.includes(scope))) throw new Error(MISSING_SCOPES);
+    if (![MAIL_SCOPE, FILTER_SCOPE].every(scope => granted.includes(scope))) throw missingScopes();
     this.save(answer, { user: await gmailAddress(answer.access_token) });
   }
 

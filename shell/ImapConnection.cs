@@ -47,7 +47,7 @@ public sealed class ImapConnection(ImapStore store)
         {
             Drop();
             store.Refused();
-            throw new NotSignedInException(store.Error ?? "Please sign in again.");
+            throw new NotSignedInException(store.Error ?? Texts.L("Please sign in again.", "Vuelve a iniciar sesión."));
         }
         catch (ImapCommandException e)
         {
@@ -56,7 +56,7 @@ public sealed class ImapConnection(ImapStore store)
         catch (Exception e) when (Dropped(e) || e is SslHandshakeException)
         {
             Drop();
-            throw new MailServerException("Lost the connection to the mail server: " + e.Message);
+            throw new MailServerException(Texts.L("Lost the connection to the mail server: ", "Se perdió la conexión con el servidor de correo: ") + e.Message);
         }
         finally
         {
@@ -80,7 +80,8 @@ public sealed class ImapConnection(ImapStore store)
 
     async Task<ImapClient> ClientAsync(CancellationToken ct)
     {
-        var login = store.Active ?? throw new NotSignedInException("Please sign in to your mail server again.");
+        var login = store.Active ?? throw new NotSignedInException(
+            Texts.L("Please sign in to your mail server again.", "Vuelve a iniciar sesión en tu servidor de correo."));
         if (client is { IsConnected: true, IsAuthenticated: true } && connectedAs == login) return client;
         Drop();
         client = await ConnectAsync(login, ct);
@@ -136,24 +137,31 @@ public sealed class ImapConnection(ImapStore store)
         }
         catch (AuthenticationException)
         {
-            return $"{login.Host} refused that user name and password. Many providers only let other apps in with an app password: " +
-                   "create one in your account's security settings and use it here.";
+            return Texts.L($"{login.Host} refused that user name and password. Many providers only let other apps in with an app password: "
+                    + "create one in your account's security settings and use it here.",
+                $"{login.Host} rechazó ese nombre de usuario y esa contraseña. Muchos proveedores solo dejan entrar a otras apps con una "
+                    + "contraseña de aplicación: créala en la configuración de seguridad de tu cuenta y úsala aquí.");
         }
         catch (SslHandshakeException)
         {
-            return $"Couldn't open a secure connection to {where}. Check the port and security (usually 993 with SSL/TLS, or 143 with STARTTLS).";
+            return Texts.L($"Couldn't open a secure connection to {where}. Check the port and security (usually 993 with SSL/TLS, or 143 with STARTTLS).",
+                $"No se pudo abrir una conexión segura con {where}. Revisa el puerto y la seguridad (normalmente 993 con SSL/TLS, o 143 con STARTTLS).");
         }
         catch (NotSupportedException e) when (e.Message.Contains("STARTTLS", StringComparison.OrdinalIgnoreCase))
         {
-            return $"{where} doesn't offer STARTTLS, so the app won't send your password there. Try port 993 with SSL/TLS.";
+            return Texts.L($"{where} doesn't offer STARTTLS, so the app won't send your password there. Try port 993 with SSL/TLS.",
+                $"{where} no ofrece STARTTLS, así que la app no enviará allí tu contraseña. Prueba el puerto 993 con SSL/TLS.");
         }
         catch (NotSupportedException)
         {
-            return $"{login.Host} doesn't let apps sign in with a password over IMAP.";
+            return Texts.L($"{login.Host} doesn't let apps sign in with a password over IMAP.",
+                $"{login.Host} no deja que las apps inicien sesión con contraseña por IMAP.");
         }
         catch (Exception e) when (e is SocketException or IOException or ImapProtocolException or OperationCanceledException)
         {
-            return ct.IsCancellationRequested ? "Cancelled." : $"Couldn't reach an IMAP server at {where}. Check the server name and port.";
+            return ct.IsCancellationRequested ? Texts.L("Cancelled.", "Cancelado.")
+                : Texts.L($"Couldn't reach an IMAP server at {where}. Check the server name and port.",
+                    $"No se pudo conectar con un servidor IMAP en {where}. Revisa el nombre del servidor y el puerto.");
         }
     }
 

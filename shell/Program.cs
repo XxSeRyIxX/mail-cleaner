@@ -75,10 +75,12 @@ internal static class Program
         }
         catch (SocketException)
         {
-            window.LoadRawString(LoopbackHttp.MessagePage("Mail Cleaner can't start",
-                $"Local port {Site.Port} is in use by another program.",
-                "Close it, or an older Mail Cleaner that is still running, then open the app again. " +
-                "Your settings and your remove list have not been changed."));
+            window.LoadRawString(LoopbackHttp.MessagePage(Texts.L("Mail Cleaner can't start", "Mail Cleaner no puede arrancar"),
+                Texts.L($"Local port {Site.Port} is in use by another program.", $"El puerto local {Site.Port} lo está usando otro programa."),
+                Texts.L("Close it, or an older Mail Cleaner that is still running, then open the app again. "
+                    + "Your settings and your remove list have not been changed.",
+                    "Ciérralo, o cierra un Mail Cleaner anterior que siga abierto, y vuelve a abrir la app. "
+                    + "Tu configuración y tu lista para eliminar no han cambiado.")));
             window.WaitForClose();
         }
     }

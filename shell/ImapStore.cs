@@ -47,16 +47,19 @@ public sealed class ImapStore
     {
         var email = req.Email?.Trim() ?? "";
         if (!MailAddress.TryCreate(email, out var address) || address.Address != email)
-            throw new ApiException(400, "Type your email address, for example name@example.com.");
+            throw new ApiException(400, Texts.L("Type your email address, for example name@example.com.",
+                "Escribe tu dirección de correo, por ejemplo nombre@example.com."));
         var host = req.Host?.Trim().ToLowerInvariant() ?? "";
-        if (!ImapServers.HostName().IsMatch(host)) throw new ApiException(400, "Type the IMAP server, for example imap.example.com.");
+        if (!ImapServers.HostName().IsMatch(host))
+            throw new ApiException(400, Texts.L("Type the IMAP server, for example imap.example.com.",
+                "Escribe el servidor IMAP, por ejemplo imap.example.com."));
         var port = req.Port ?? 993;
-        if (port is < 1 or > 65535) throw new ApiException(400, "The port is a number, usually 993.");
+        if (port is < 1 or > 65535) throw new ApiException(400, Texts.L("The port is a number, usually 993.", "El puerto es un número, normalmente 993."));
         var user = string.IsNullOrWhiteSpace(req.User) ? email : req.User.Trim();
         var draft = new ImapLogin(email, user, host, port, req.Security == "starttls", "");
         var password = !string.IsNullOrEmpty(req.Password) ? req.Password
             : Active is { } saved && saved with { Password = "" } == draft ? saved.Password   // same server and user: keep the saved one
-            : throw new ApiException(400, "Type your password, or an app password.");
+            : throw new ApiException(400, Texts.L("Type your password, or an app password.", "Escribe tu contraseña, o una contraseña de aplicación."));
         var checkedLogin = draft with { Password = password };
         if (await ImapConnection.TestAsync(checkedLogin, ct) is { } problem) throw new ApiException(400, problem);
         Save(checkedLogin);
@@ -68,7 +71,8 @@ public sealed class ImapStore
     public void Refused()
     {
         SignOut();
-        Error = "Your mail server refused the saved password. Type it again.";
+        Error = Texts.L("Your mail server refused the saved password. Type it again.",
+            "Tu servidor de correo rechazó la contraseña guardada. Escríbela de nuevo.");
     }
 
     void Save(ImapLogin? value)
